@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>geospatial-audio-js — Demo</title>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <!-- ── Start overlay ── -->
+    <div id="overlay">
+      <div class="card">
+        <h1>geospatial-audio-js</h1>
+        <p>
+          地図上に配置された音源を<br />
+          3Dサウンドで体験するデモです。<br />
+          <strong>イヤホン推奨</strong>
+        </p>
+        <ul class="controls">
+          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — 移動</li>
+          <li><kbd>Shift</kbd> + 上記 — 高速移動</li>
+          <li>マウスドラッグ — 視点回転</li>
+          <li>スクロール — ズーム</li>
+        </ul>
+        <button id="start-btn">🎵 音響を開始</button>
+        <p class="note">※ ブラウザのAutoplay制限のため、ボタン操作が必要です</p>
+      </div>
+    </div>
+
+    <!-- ── Status panel ── -->
+    <div id="status-panel">
+      <div class="panel-title">音源状態</div>
+      <ul id="sound-list"></ul>
+      <div class="legend">
+        <span class="dot playing"></span>再生中
+        <span class="dot culled"></span>範囲外
+        <span class="dot loading"></span>読込中
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE
+.idea/
+.vscode/
+
+# Internal documents — not for public release
+docs/requirements.md
+docs/architecture.md
+
+# Misc
+PannerNodeTest-main/

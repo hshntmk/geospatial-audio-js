@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>geospatial-audio-js — 体験デモ</title>
+  <script>
+    window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/';
+  </script>
+  <link rel="stylesheet"
+        href="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Widgets/widgets.css" />
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Cesium.js"></script>
+</head>
+<body>
+
+  <div id="cesiumContainer"></div>
+
+  <!-- ── 開始オーバーレイ ─────────────────────────────────────── -->
+  <div id="start-overlay">
+    <div class="start-inner">
+      <div class="lib-name">geospatial-audio-js</div>
+      <h1>地図上で<br>音が動く</h1>
+      <p class="tagline">
+        カメラが動くと、音の<em>方向・距離・高さ</em>がリアルタイムに変わる。<br>
+        Web Audio API × 3D地図による立体音響デモ。
+      </p>
+      <div class="headphone-badge">
+        <span class="hp-icon">🎧</span>
+        <span>ヘッドフォン推奨</span>
+      </div>
+      <button id="start-btn">体験を始める</button>
+      <p class="map-credit">地図: 国土地理院 衛星写真</p>
+    </div>
+  </div>
+
+  <!-- ── ツアーカード（ツアー中に表示） ────────────────────────── -->
+  <div id="tour-card" class="hidden">
+    <div class="tour-step-label" id="tour-step-label">STEP 1 / 6</div>
+    <h2 id="tour-title"></h2>
+    <p id="tour-subtitle"></p>
+    <div id="tour-dots"></div>
+    <button id="skip-btn">自分で動かす →</button>
+  </div>
+
+  <!-- ── 空間音響トグル（オーディオ開始後に表示） ──────────────── -->
+  <button id="spatial-btn" class="hidden" data-on="true">🔊 空間音響: ON</button>
+
+  <!-- ── マニュアルモードのヒント ──────────────────────────────── -->
+  <div id="manual-hint" class="hidden">
+    <p>ドラッグ・スクロールで自由に移動できます</p>
+    <p class="hint-sub">音源マーカーに近づくほど音が大きく聴こえます</p>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

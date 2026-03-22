@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>geospatial-audio-js — Cesium デモ</title>
+
+  <!--
+    Cesium は CDN から読み込みます。
+    CESIUM_BASE_URL を先に設定しないと Web Worker が失敗します。
+  -->
+  <script>
+    window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/';
+  </script>
+  <link rel="stylesheet"
+        href="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Widgets/widgets.css" />
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Cesium.js"></script>
+</head>
+<body>
+
+  <!-- Cesium renders into this div -->
+  <div id="cesiumContainer"></div>
+
+  <!-- Start overlay -->
+  <div id="overlay">
+    <div class="card">
+      <h1>🌍 Geospatial Audio<br><small>Cesium デモ</small></h1>
+      <p>3D 地球儀上に音源を配置します。<br>カメラを移動・回転すると音の聞こえ方が変わります。</p>
+      <ul class="controls">
+        <li><kbd>左ドラッグ</kbd> — 視点回転</li>
+        <li><kbd>右ドラッグ</kbd> / <kbd>中ドラッグ</kbd> — カメラ移動</li>
+        <li><kbd>スクロール</kbd> — 高度変更</li>
+      </ul>
+      <button id="start-btn">🎧 オーディオを開始</button>
+      <p class="note">
+        ※ 地図タイルは国土地理院の写真を使用しています。<br>
+        ※ ヘッドフォン推奨（立体音響が最もよく聴こえます）。
+      </p>
+    </div>
+  </div>
+
+  <!-- Status panel (top-right) -->
+  <div id="status-panel">
+    <p class="panel-title">音源</p>
+    <ul id="sound-list"></ul>
+    <div class="legend">
+      <span class="dot playing"></span>再生中
+      <span class="dot culled"></span>範囲外
+      <span class="dot loading"></span>読込中
+    </div>
+    <hr />
+    <div id="camera-info">
+      <p>高度: <span id="altitude">—</span> m</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
