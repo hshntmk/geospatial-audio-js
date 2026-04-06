@@ -1,18 +1,16 @@
 # geospatial-audio-js
 
-A general-purpose JavaScript library that adds 3D spatial audio to web map libraries.
-Places geographically-positioned sound sources in 3D space using the Web Audio API's `PannerNode`. Automatically synchronizes the listener's orientation with map movement, rotation, and pitch to deliver an immersive 3D audio experience.
+Web地図ライブラリに3D音響機能を追加する汎用JavaScriptライブラリです。
+地図上の地理座標を持つ音源を、Web Audio API の `PannerNode` を使って3D空間に配置します。地図の移動・回転・ピッチに合わせてリスナーの向きを自動同期し、立体音響体験を実現します。
 
-[日本語版 README はこちら](README.ja.md)
+## 特徴
 
-## Features
+- **地図ライブラリ非依存** — アダプターパターンで MapLibre GL JS・Leaflet・Cesium に対応
+- **Web Audio API ベース** — HRTF による高品質な3D音響
+- **リバーブ** — 部屋・ホール・屋外プリセット、またはカスタム IR による環境音響
+- **距離カリング** — 指定距離以上の音源を自動停止・再開
 
-- **Map library agnostic** — Adapter pattern supports MapLibre GL JS, Leaflet, and Cesium
-- **Web Audio API based** — High-quality 3D audio via HRTF
-- **Reverb** — Room, hall, and outdoor presets, or custom IR for environmental acoustics
-- **Distance culling** — Automatically stops and resumes sound sources beyond a specified distance
-
-## Quick Start
+## クイックスタート
 
 ### MapLibre GL JS
 
@@ -29,7 +27,7 @@ const map = new maplibregl.Map({
 
 const audio = new GeospatialAudio(new MapLibreAdapter(map));
 
-// AudioContext must be resumed after a user gesture
+// AudioContext はユーザー操作後に解放される
 document.getElementById('start').addEventListener('click', async () => {
   await audio.initialize();
 
@@ -40,8 +38,8 @@ document.getElementById('start').addEventListener('click', async () => {
     loop: true,
     autoplay: true,
     pannerOptions: {
-      refDistance: 10,    // reference distance (m) for full volume
-      maxDistance: 200,   // beyond this distance (m), sound becomes inaudible
+      refDistance: 10,    // この距離（m）で基準音量
+      maxDistance: 200,   // この距離（m）以上では聴こえなくなる
       rolloffFactor: 1.5,
     },
   });
@@ -84,42 +82,42 @@ document.getElementById('start').addEventListener('click', async () => {
 });
 ```
 
-As you pan and rotate the map, the distance and direction to each sound source change and the 3D audio updates in real time.
+地図を移動するだけで音源との距離・方向が変わり、3D音響が追従します。
 
-## Key API
+## 主なAPI
 
-### Sound Management
+### 音源管理
 
 ```ts
-// Add (async — fetches and decodes the audio file)
+// 追加（非同期 — 音声ファイルを fetch してデコード）
 await audio.addSound({ id, position, url, loop, volume, autoplay, pannerOptions });
 
-// Playback control
+// 制御
 audio.playSound('id');
 audio.pauseSound('id');
 audio.stopSound('id');
 audio.setVolume('id', 0.5);
 audio.removeSound('id');
 
-// Update position (for moving sound sources)
+// 位置更新（移動する音源向け）
 audio.updateSoundPosition('id', [lng, lat, altitude]);
 ```
 
-### Listener (Camera) Management
+### リスナー（カメラ）管理
 
 ```ts
-// Auto-sync with the map camera (enabled by default)
+// 地図カメラとの自動同期（デフォルト有効）
 audio.syncWithMap(true);
 
-// Set position and orientation manually
+// 手動で位置・向きを設定
 audio.setListenerPosition([lng, lat, altitude]);
 audio.setListenerOrientation(bearing, pitch, roll);
 ```
 
-### Reverb (Environmental Acoustics)
+### リバーブ（環境音響）
 
 ```ts
-// Use a preset
+// プリセットを使う
 audio.setReverb({
   enabled: true,
   type: 'room',   // 'room' | 'hall' | 'outdoor'
@@ -127,33 +125,33 @@ audio.setReverb({
   dry: 0.7,
 });
 
-// Disable reverb
+// リバーブを無効化
 audio.disableReverb();
 ```
 
-### Master Volume
+### マスターボリューム
 
 ```ts
-audio.setMasterVolume(0.8); // 0.0 – 1.0
+audio.setMasterVolume(0.8); // 0.0 〜 1.0
 ```
 
-### Performance Optimization
+### パフォーマンス最適化
 
 ```ts
 audio.setOptimization({
-  maxActiveSounds: 10,    // maximum number of simultaneously playing sounds
-  cullingDistance: 5000,  // automatically stop sounds beyond this distance (m)
-  updateInterval: 100,    // culling update interval (ms)
+  maxActiveSounds: 10,    // 同時再生数の上限
+  cullingDistance: 5000,  // この距離（m）以上の音源を自動停止
+  updateInterval: 100,    // カリング更新間隔（ms）
 });
 ```
 
-### Debug
+### デバッグ
 
 ```ts
-// Enable debug mode (logs to console)
+// デバッグモードを有効化（コンソールへのログ出力）
 audio.enableDebug({ logAudioParams: true, logPerformance: true });
 
-// Get a snapshot of the current audio state
+// 現在の音響状態スナップショットを取得
 const info = audio.getDebugInfo();
 // {
 //   activeSounds: 3,
@@ -166,7 +164,7 @@ const info = audio.getDebugInfo();
 audio.disableDebug();
 ```
 
-### Events
+### イベント
 
 ```ts
 audio.on('soundLoaded',   (id) => console.log(`${id} loaded`));
@@ -176,55 +174,55 @@ audio.on('soundUnculled', (id) => console.log(`${id} is in range again`));
 audio.on('soundError',    (id, err) => console.error(err));
 ```
 
-### Lifecycle
+### ライフサイクル
 
 ```ts
-// Initialize (call after a user gesture)
+// 初期化（ユーザー操作後に呼ぶ）
 await audio.initialize();
 
-// Clean up
+// 後片付け
 audio.dispose();
 ```
 
-## Demo
+## デモ
 
-See the demos to experience the library in action. For details, see [docs/demo.md](docs/demo.md).
+実際の動作はデモで確認できます。詳細は [docs/demo.md](docs/demo.md) を参照してください。
 
-| Demo | Command |
+| デモ | 起動コマンド |
 |---|---|
-| MapLibre GL JS (2D/3D) | `npm run dev:demo` |
-| CesiumJS (3D Globe) | `npm run dev:demo-cesium` |
+| MapLibre GL JS（2D/3D） | `npm run dev:demo` |
+| CesiumJS（3D 地球儀） | `npm run dev:demo-cesium` |
 
 ```bash
-# MapLibre demo
+# MapLibre デモ
 npm run dev:demo
 
-# Cesium demo
+# Cesium デモ
 npm run dev:demo-cesium
 ```
 
-Both are available at `http://localhost:5173/`.
+いずれも `http://localhost:5173/` で確認できます。
 
-## Documentation
+## ドキュメント
 
-| Document | Description |
+| ドキュメント | 内容 |
 |---|---|
-| [docs/api.md](docs/api.md) | **API Reference** (all methods and type definitions) |
-| [docs/demo.md](docs/demo.md) | Demo setup and walkthrough |
+| [docs/api.md](docs/api.md) | **APIリファレンス**（全メソッド・型定義） |
+| [docs/demo.md](docs/demo.md) | デモの起動・解説 |
 
-## Browser Support
+## 対応ブラウザ
 
-Browsers that support the Web Audio API (`PannerNode`):
+Web Audio API (`PannerNode`) に対応した以下のブラウザ:
 
-- Chrome / Edge (latest)
-- Firefox (latest)
-- Safari (latest, iOS 14+)
+- Chrome / Edge 最新版
+- Firefox 最新版
+- Safari 最新版（iOS 14+）
 
-## Supported Map Libraries
+## 対応地図ライブラリ
 
-| Library | Status |
+| ライブラリ | 状況 |
 |---|---|
-| MapLibre GL JS | ✅ Supported |
-| Leaflet | ✅ Supported |
-| Cesium | ✅ Supported |
-| Google Maps | 🔜 Planned (Phase 3) |
+| MapLibre GL JS | ✅ 対応済み |
+| Leaflet | ✅ 対応済み |
+| Cesium | ✅ 対応済み |
+| Google Maps | 🔜 Phase 3 予定 |

@@ -1,38 +1,38 @@
-# API リファレンス
+# API Reference
 
-> `GeospatialAudio` クラスの全パブリックメソッドと型定義
-
----
-
-## 目次
-
-1. [コンストラクタ](#コンストラクタ)
-2. [ライフサイクル](#ライフサイクル)
-3. [音源管理](#音源管理)
-4. [リスナー管理](#リスナー管理)
-5. [リバーブ](#リバーブ)
-6. [マスターボリューム](#マスターボリューム)
-7. [パフォーマンス最適化](#パフォーマンス最適化)
-8. [スケール調整](#スケール調整)
-9. [デバッグ](#デバッグ)
-10. [ログ](#ログ)
-11. [イベント](#イベント)
-12. [型定義](#型定義)
+> All public methods and type definitions for the `GeospatialAudio` class
 
 ---
 
-## コンストラクタ
+## Table of Contents
+
+1. [Constructor](#constructor)
+2. [Lifecycle](#lifecycle)
+3. [Sound Management](#sound-management)
+4. [Listener Management](#listener-management)
+5. [Reverb](#reverb)
+6. [Master Volume](#master-volume)
+7. [Performance Optimization](#performance-optimization)
+8. [Scale Adjustment](#scale-adjustment)
+9. [Debug](#debug)
+10. [Logging](#logging)
+11. [Events](#events)
+12. [Type Definitions](#type-definitions)
+
+---
+
+## Constructor
 
 ```ts
 new GeospatialAudio(adapter: MapAdapter, options?: GeospatialAudioOptions)
 ```
 
-| 引数 | 型 | 説明 |
+| Parameter | Type | Description |
 |---|---|---|
-| `adapter` | `MapAdapter` | 地図ライブラリ用アダプターのインスタンス |
-| `options` | `GeospatialAudioOptions` | 任意。グローバルな音響パラメータ |
+| `adapter` | `MapAdapter` | An instance of a map library adapter |
+| `options` | `GeospatialAudioOptions` | Optional. Global audio parameters |
 
-アダプターを明示的に生成して渡します。各アダプタークラスは `geospatial-audio-js` からインポートできます。
+Create an adapter instance explicitly and pass it to the constructor. Each adapter class can be imported from `geospatial-audio-js`.
 
 ```ts
 import { GeospatialAudio, MapLibreAdapter, LeafletAdapter, CesiumAdapter } from 'geospatial-audio-js';
@@ -51,21 +51,21 @@ const audio = new GeospatialAudio(new CesiumAdapter(viewer, Cesium));
 
 ```ts
 interface GeospatialAudioOptions {
-  distanceModel?: 'linear' | 'inverse' | 'exponential'; // デフォルト: 'inverse'
-  refDistance?:   number;  // デフォルト: 5
-  maxDistance?:   number;  // デフォルト: 10000
-  rolloffFactor?: number;  // デフォルト: 1
-  panningModel?:  'HRTF' | 'equalpower'; // デフォルト: 'HRTF'
+  distanceModel?: 'linear' | 'inverse' | 'exponential'; // default: 'inverse'
+  refDistance?:   number;  // default: 5
+  maxDistance?:   number;  // default: 10000
+  rolloffFactor?: number;  // default: 1
+  panningModel?:  'HRTF' | 'equalpower'; // default: 'HRTF'
 }
 ```
 
 ---
 
-## ライフサイクル
+## Lifecycle
 
 ### `initialize(): Promise<void>`
 
-AudioContext を resume してリスナーと音源の初期同期を行います。ブラウザの Autoplay ポリシーにより、**必ずユーザー操作のハンドラ内で呼ぶ**必要があります。
+Resumes the AudioContext and performs the initial sync of the listener and sound sources. Due to browser autoplay policies, **this must be called inside a user gesture handler**.
 
 ```ts
 button.addEventListener('click', async () => {
@@ -75,7 +75,7 @@ button.addEventListener('click', async () => {
 
 ### `dispose(): void`
 
-全音源・AudioContext・イベントリスナーを解放します。ページ離脱時に呼んでください。
+Releases all sound sources, the AudioContext, and event listeners. Call this when leaving the page.
 
 ```ts
 window.addEventListener('beforeunload', () => audio.dispose());
@@ -83,20 +83,20 @@ window.addEventListener('beforeunload', () => audio.dispose());
 
 ### `checkAutoplaySupport(): Promise<boolean>`
 
-AudioContext が `running` 状態かどうかを返します。ユーザー操作前は `false` になります。
+Returns whether the AudioContext is in the `running` state. Returns `false` before a user gesture.
 
 ---
 
-## 音源管理
+## Sound Management
 
 ### `addSound(config: SoundConfig): Promise<void>`
 
-音声ファイルを fetch・デコードして音源を追加します。同じ URL は内部でキャッシュされます。
+Fetches and decodes an audio file, then adds a sound source. The same URL is cached internally.
 
 ```ts
 await audio.addSound({
   id: 'bell',
-  position: [139.691, 35.691],       // [経度, 緯度]
+  position: [139.691, 35.691],       // [longitude, latitude]
   url: 'audio/bell.mp3',
   loop: true,
   autoplay: true,
@@ -113,12 +113,12 @@ await audio.addSound({
 ```ts
 interface SoundConfig {
   id:            string;
-  position:      [number, number, number?];  // [経度, 緯度, 高度(m)?]
+  position:      [number, number, number?];  // [longitude, latitude, altitude(m)?]
   url:           string;
-  loop?:         boolean;                    // デフォルト: false
-  volume?:       number;                     // 0–1、デフォルト: 1.0
-  autoplay?:     boolean;                    // initialize() 後に自動再生
-  maxDistance?:  number;                     // カリング距離（m）。未指定は cullingDistance を使用
+  loop?:         boolean;                    // default: false
+  volume?:       number;                     // 0–1, default: 1.0
+  autoplay?:     boolean;                    // auto-play after initialize()
+  maxDistance?:  number;                     // culling distance (m). Uses cullingDistance if not set
   pannerOptions?: SoundPannerOptions;
 }
 ```
@@ -129,12 +129,12 @@ interface SoundConfig {
 interface SoundPannerOptions {
   panningModel?:  'HRTF' | 'equalpower';
   distanceModel?: 'linear' | 'inverse' | 'exponential';
-  refDistance?:   number;   // この距離(m)で基準音量(1.0)
-  maxDistance?:   number;   // PannerNode の最大距離(m)
-  rolloffFactor?: number;   // 距離減衰係数（大きいほど急峻）
-  coneInnerAngle?: number;  // 指向性: 内側コーン角度(度)
-  coneOuterAngle?: number;  // 指向性: 外側コーン角度(度)
-  coneOuterGain?:  number;  // 指向性: 外側コーンのゲイン
+  refDistance?:   number;   // distance (m) at which volume equals 1.0
+  maxDistance?:   number;   // maximum distance (m) for PannerNode
+  rolloffFactor?: number;   // distance attenuation factor (higher = steeper drop-off)
+  coneInnerAngle?: number;  // directivity: inner cone angle (degrees)
+  coneOuterAngle?: number;  // directivity: outer cone angle (degrees)
+  coneOuterGain?:  number;  // directivity: gain outside the outer cone
 }
 ```
 
@@ -142,31 +142,31 @@ interface SoundPannerOptions {
 
 ### `removeSound(id: string): void`
 
-音源を停止・削除します。
+Stops and removes a sound source.
 
 ### `playSound(id: string): void`
 
-音源を再生します。
+Starts playback of a sound source.
 
 ### `pauseSound(id: string): void`
 
-音源を一時停止します。
+Pauses a sound source.
 
 ### `stopSound(id: string): void`
 
-音源を停止（再生位置をリセット）します。
+Stops a sound source (resets playback position).
 
 ### `setVolume(id: string, volume: number): void`
 
-音源の音量を変更します（`0.0`–`1.0`）。
+Sets the volume of a sound source (`0.0`–`1.0`).
 
 ### `getVolume(id: string): number`
 
-現在の音量を返します。
+Returns the current volume of a sound source.
 
 ### `getSoundState(id: string): SoundState | undefined`
 
-音源の状態を返します。音源が存在しない場合は `undefined`。
+Returns the state of a sound source. Returns `undefined` if the sound does not exist.
 
 ```ts
 type SoundState = 'loading' | 'ready' | 'playing' | 'paused' | 'stopped' | 'error';
@@ -174,24 +174,24 @@ type SoundState = 'loading' | 'ready' | 'playing' | 'paused' | 'stopped' | 'erro
 
 ### `updateSoundPosition(id: string, position: [number, number, number?]): void`
 
-移動する音源の位置をリアルタイムで更新します。
+Updates the position of a moving sound source in real time.
 
 ```ts
-// 飛行中のドローン音源の追跡
+// Track a drone in flight
 audio.updateSoundPosition('drone', [newLng, newLat, altitude]);
 ```
 
 ---
 
-## リスナー管理
+## Listener Management
 
 ### `syncWithMap(enabled: boolean): void`
 
-地図カメラとの自動同期を有効／無効にします。デフォルトは有効（`true`）。
+Enables or disables automatic synchronization with the map camera. Enabled (`true`) by default.
 
 ### `setListenerPosition(position: [number, number, number?]): void`
 
-リスナーの地理的位置を手動で設定します。呼び出すと自動同期が無効になります。
+Manually sets the listener's geographic position. Calling this disables auto-sync.
 
 ```ts
 audio.setListenerPosition([139.69, 35.69, 0]);
@@ -199,17 +199,17 @@ audio.setListenerPosition([139.69, 35.69, 0]);
 
 ### `setListenerOrientation(bearing: number, pitch: number, roll?: number): void`
 
-リスナーの向きを手動で設定します。呼び出すと自動同期が無効になります。
+Manually sets the listener's orientation. Calling this disables auto-sync.
 
-| 引数 | 説明 |
+| Parameter | Description |
 |---|---|
-| `bearing` | 方位角（度）: 0=北、90=東、180=南、270=西 |
-| `pitch` | 仰角（度）: 0=水平、正=上向き |
-| `roll` | ロール（度）: 省略可 |
+| `bearing` | Azimuth (degrees): 0=North, 90=East, 180=South, 270=West |
+| `pitch` | Elevation (degrees): 0=horizontal, positive=upward |
+| `roll` | Roll (degrees): optional |
 
 ### `getListenerInfo(): ListenerInfo`
 
-現在のリスナー情報を返します。
+Returns the current listener information.
 
 ```ts
 interface ListenerInfo {
@@ -221,25 +221,25 @@ interface ListenerInfo {
 
 ---
 
-## リバーブ
+## Reverb
 
 ### `setReverb(config: ReverbConfig): void`
 
-リバーブエフェクトを設定します。`enabled: false` を渡すと `disableReverb()` と同等です。
+Configures the reverb effect. Passing `enabled: false` is equivalent to calling `disableReverb()`.
 
 ```ts
-// プリセットを使う
+// Use a preset
 audio.setReverb({
   enabled: true,
   type: 'room',   // 'room' | 'hall' | 'outdoor'
-  wet: 0.3,       // リバーブ成分 0–1（デフォルト: 0.3）
-  dry: 1.0,       // 直接音 0–1（デフォルト: 1.0）
+  wet: 0.3,       // reverb mix 0–1 (default: 0.3)
+  dry: 1.0,       // direct signal 0–1 (default: 1.0)
 });
 
-// decay を直接指定（type より優先）
+// Specify decay directly (takes priority over type)
 audio.setReverb({ enabled: true, decay: 2.5, wet: 0.4, dry: 0.8 });
 
-// カスタムインパルス応答（AudioBuffer）を使う
+// Use a custom impulse response (AudioBuffer)
 audio.setReverb({ enabled: true, customIR: myIRBuffer, wet: 0.5 });
 ```
 
@@ -248,25 +248,25 @@ audio.setReverb({ enabled: true, customIR: myIRBuffer, wet: 0.5 });
 ```ts
 interface ReverbConfig {
   enabled:    boolean;
-  type?:      'room' | 'hall' | 'outdoor'; // プリセット
-  decay?:     number;      // 残響時間(秒)。type より優先
-  wet?:       number;      // リバーブ成分 0–1（デフォルト: 0.3）
-  dry?:       number;      // 直接音 0–1（デフォルト: 1.0）
-  customIR?:  AudioBuffer; // カスタムインパルス応答
+  type?:      'room' | 'hall' | 'outdoor'; // preset
+  decay?:     number;      // reverb tail length (seconds). Takes priority over type
+  wet?:       number;      // reverb mix 0–1 (default: 0.3)
+  dry?:       number;      // direct signal 0–1 (default: 1.0)
+  customIR?:  AudioBuffer; // custom impulse response
 }
 ```
 
-#### プリセット特性
+#### Preset Characteristics
 
-| `type` | `decay` | 用途 |
+| `type` | `decay` | Use case |
 |---|---|---|
-| `'room'` | 1.0 秒 | 室内・建物 |
-| `'hall'` | 3.0 秒 | コンサートホール・大空間 |
-| `'outdoor'` | 0.4 秒 | 屋外（最小限の反射） |
+| `'room'` | 1.0 s | Indoor / building |
+| `'hall'` | 3.0 s | Concert hall / large space |
+| `'outdoor'` | 0.4 s | Outdoors (minimal reflections) |
 
-> **仕組み:** アルゴリズムによるインパルス応答生成（白色雑音 × 指数減衰）を使用します。外部 IR ファイルは不要です。
+> **How it works:** Uses algorithmically generated impulse responses (white noise × exponential decay). No external IR files required.
 
-#### 内部オーディオグラフ（リバーブ有効時）
+#### Internal Audio Graph (when reverb is enabled)
 
 ```
 masterGain ─┬─ dryGain ─────────────── destination
@@ -275,15 +275,15 @@ masterGain ─┬─ dryGain ─────────────── desti
 
 ### `disableReverb(): void`
 
-リバーブを無効化してオーディオグラフを元に戻します。
+Disables reverb and restores the audio graph to its original routing.
 
 ---
 
-## マスターボリューム
+## Master Volume
 
 ### `setMasterVolume(volume: number): void`
 
-全音源に適用されるマスターボリュームを設定します（`0.0`–`1.0`、範囲外はクランプ）。
+Sets the master volume applied to all sound sources (`0.0`–`1.0`, clamped if out of range).
 
 ```ts
 audio.setMasterVolume(0.8);
@@ -291,61 +291,61 @@ audio.setMasterVolume(0.8);
 
 ---
 
-## パフォーマンス最適化
+## Performance Optimization
 
 ### `setOptimization(config: Partial<OptimizationConfig>): void`
 
-カリングや同時再生数の上限を設定します。
+Configures culling and the maximum number of simultaneously active sounds.
 
 ```ts
 audio.setOptimization({
-  maxActiveSounds: 10,    // 同時再生数の上限（デフォルト: 10）
-  cullingDistance: 5000,  // この距離(m)以上の音源を自動停止（デフォルト: 5000）
-  updateInterval:  100,   // カリング更新間隔(ms)（デフォルト: 100）
+  maxActiveSounds: 10,    // max simultaneous sounds (default: 10)
+  cullingDistance: 5000,  // automatically stop sounds beyond this distance in m (default: 5000)
+  updateInterval:  100,   // culling update interval in ms (default: 100)
 });
 ```
 
 ```ts
 interface OptimizationConfig {
-  maxActiveSounds?: number; // デフォルト: 10
-  cullingDistance?: number; // デフォルト: 5000
-  updateInterval?:  number; // デフォルト: 100
-  priorityMode?:    'distance' | 'volume' | 'custom'; // デフォルト: 'distance'
+  maxActiveSounds?: number; // default: 10
+  cullingDistance?: number; // default: 5000
+  updateInterval?:  number; // default: 100
+  priorityMode?:    'distance' | 'volume' | 'custom'; // default: 'distance'
 }
 ```
 
-カリングされた音源は `soundCulled` イベントで通知され、範囲内に戻ると自動再開（`soundUnculled`）します。
+Culled sounds trigger the `soundCulled` event, and are automatically resumed when back in range (`soundUnculled`).
 
 ---
 
-## スケール調整
+## Scale Adjustment
 
 ### `setScale(scale: ScaleConfig): void`
 
-地理距離→音響距離のスケールを調整します。
+Adjusts the scale mapping from geographic distance to audio distance.
 
 ```ts
 audio.setScale({
-  horizontal: 1.0, // 水平方向（経緯度）のスケール
-  vertical:   1.0, // 垂直方向（高度）のスケール
-  global:     1.0, // 全体スケール
+  horizontal: 1.0, // horizontal (longitude/latitude) scale
+  vertical:   1.0, // vertical (altitude) scale
+  global:     1.0, // overall scale
 });
 ```
 
-> **用途例:** 広大なエリア（数 km）の音源を聴こえやすくしたい場合に `horizontal` を大きくします。
+> **Example use case:** Increase `horizontal` to make sound sources spread over a large area (several km) more audible.
 
 ---
 
-## デバッグ
+## Debug
 
 ### `enableDebug(config: DebugConfig): void`
 
-デバッグモードを有効にします。
+Enables debug mode.
 
 ```ts
 audio.enableDebug({
-  logAudioParams:  true, // 音源位置更新のたびに PannerNode パラメータをコンソールへ出力
-  logPerformance:  true, // カリング処理時間をコンソールへ出力
+  logAudioParams:  true, // log PannerNode parameters to console on each position update
+  logPerformance:  true, // log culling processing time to console
 });
 ```
 
@@ -358,11 +358,11 @@ interface DebugConfig {
 
 ### `disableDebug(): void`
 
-デバッグモードを無効にします。
+Disables debug mode.
 
 ### `getDebugInfo(): DebugInfo`
 
-現在の音響状態のスナップショットを返します。
+Returns a snapshot of the current audio state.
 
 ```ts
 const info = audio.getDebugInfo();
@@ -407,18 +407,18 @@ interface SoundDebugInfo {
 
 ---
 
-## ログ
+## Logging
 
 ### `setLogLevel(level: LogLevel): void`
 
-ライブラリ内部のログ出力レベルを設定します。
+Sets the internal log output level for the library.
 
 ```ts
-audio.setLogLevel('debug'); // 最も詳細
-audio.setLogLevel('info');  // デフォルト
+audio.setLogLevel('debug'); // most verbose
+audio.setLogLevel('info');  // default
 audio.setLogLevel('warn');
 audio.setLogLevel('error');
-audio.setLogLevel('none');  // 無効
+audio.setLogLevel('none');  // silent
 ```
 
 ```ts
@@ -427,67 +427,67 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'none';
 
 ---
 
-## イベント
+## Events
 
 ### `on(event: string, handler: (...args: unknown[]) => void): void`
 
-イベントリスナーを登録します。
+Registers an event listener.
 
 ### `off(event: string, handler: (...args: unknown[]) => void): void`
 
-イベントリスナーを削除します。
+Removes an event listener.
 
 ### `removeAllListeners(event?: string): void`
 
-全リスナーを削除します。`event` を指定するとそのイベントのみ削除します。
+Removes all listeners. If `event` is specified, removes only listeners for that event.
 
-### イベント一覧
+### Event Reference
 
 ```ts
-// 音源イベント
-audio.on('soundLoaded',   (id: string) => {});              // fetch・デコード完了
-audio.on('soundPlaying',  (id: string) => {});              // 再生開始
-audio.on('soundPaused',   (id: string) => {});              // 一時停止
-audio.on('soundStopped',  (id: string) => {});              // 停止
-audio.on('soundEnded',    (id: string) => {});              // ループなし音源が最後まで再生
-audio.on('soundCulled',   (id: string) => {});              // 距離カリングにより自動停止
-audio.on('soundUnculled', (id: string) => {});              // 範囲内に戻り自動再開
-audio.on('soundError',    (id: string, err: Error) => {});  // ロード／再生エラー
+// Sound events
+audio.on('soundLoaded',   (id: string) => {});              // fetch and decode complete
+audio.on('soundPlaying',  (id: string) => {});              // playback started
+audio.on('soundPaused',   (id: string) => {});              // paused
+audio.on('soundStopped',  (id: string) => {});              // stopped
+audio.on('soundEnded',    (id: string) => {});              // non-looping sound finished playing
+audio.on('soundCulled',   (id: string) => {});              // automatically stopped due to distance culling
+audio.on('soundUnculled', (id: string) => {});              // back in range and automatically resumed
+audio.on('soundError',    (id: string, err: Error) => {});  // load / playback error
 
-// リスナーイベント
+// Listener events
 audio.on('listenerMoved',   (pos: Position) => {});
 audio.on('listenerRotated', (bearing: number, pitch: number) => {});
 
-// システムイベント
+// System events
 audio.on('initialized', () => {});
 audio.on('disposed',    () => {});
 ```
 
 ---
 
-## 型定義
+## Type Definitions
 
-### 座標
+### Coordinates
 
 ```ts
-/** 地理座標 */
+/** Geographic coordinate */
 interface Position {
-  lng: number;   // 経度
-  lat: number;   // 緯度
-  alt?: number;  // 高度(m)、省略可
+  lng: number;   // longitude
+  lat: number;   // latitude
+  alt?: number;  // altitude (m), optional
 }
 
-/** 3D ベクトル（音響座標系） */
+/** 3D vector (audio coordinate system) */
 interface Vector3 { x: number; y: number; z: number; }
 
-/** カメラ向き */
+/** Camera orientation */
 interface Orientation { bearing: number; pitch: number; roll: number; }
 ```
 
-### アダプター
+### Adapter
 
 ```ts
-/** 対応する地図イベントの種別 */
+/** Supported map event types */
 type MapEvent = 'move' | 'rotate' | 'zoom' | 'pitch';
 
 interface MapAdapter {
@@ -505,15 +505,15 @@ interface MapAdapter {
 }
 ```
 
-### エクスポート一覧
+### Exports
 
 ```ts
-// クラス
+// Classes
 export { GeospatialAudio } from 'geospatial-audio-js';
 export { MapLibreAdapter } from 'geospatial-audio-js';
 export { LeafletAdapter }  from 'geospatial-audio-js';
 export { CesiumAdapter }   from 'geospatial-audio-js';
-// 型
+// Types
 export type {
   GeospatialAudioOptions,
   SoundConfig, SoundState, SoundPannerOptions, SoundInfo,

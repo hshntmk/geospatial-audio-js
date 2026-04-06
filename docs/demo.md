@@ -1,136 +1,136 @@
-# デモ解説
+# Demo Guide
 
-> `demo/` および `demo-cesium/` ディレクトリに含まれる動作サンプルの起動方法とコードの解説
+> How to run and understand the sample demos in the `demo/` and `demo-cesium/` directories
 
 ---
 
-## デモ一覧
+## Available Demos
 
-| デモ | 地図ライブラリ | 起動コマンド |
+| Demo | Map Library | Command |
 |---|---|---|
-| MapLibre デモ | MapLibre GL JS（2D/3D） | `npm run dev:demo` |
-| Cesium デモ | CesiumJS（3D 地球儀） | `npm run dev:demo-cesium` |
+| MapLibre Demo | MapLibre GL JS (2D/3D) | `npm run dev:demo` |
+| Cesium Demo | CesiumJS (3D Globe) | `npm run dev:demo-cesium` |
 
 ---
 
-## MapLibre デモ
+## MapLibre Demo
 
-### 起動方法
+### Getting Started
 
 ```bash
 npm install
 npm run dev:demo
 ```
 
-ブラウザで `http://localhost:5173/` を開き、**「オーディオを開始」** ボタンをクリックしてください。
+Open `http://localhost:5173/` in your browser and click the **"Start Audio"** button.
 
-> **イヤホン推奨** — HRTF による立体音響の効果はイヤホンで最もよく体感できます。
+> **Headphones recommended** — The HRTF-based 3D spatial audio effect is best experienced with headphones.
 
-### 操作方法
+### Controls
 
-| 操作 | 内容 |
+| Input | Action |
 |---|---|
-| `W` / `A` / `S` / `D` | 地図上を移動 |
-| `Shift` + 上記 | 高速移動 |
-| マウスドラッグ | 視点を回転 |
-| スクロール | ズームイン / アウト |
+| `W` / `A` / `S` / `D` | Move around the map |
+| `Shift` + above | Move faster |
+| Mouse drag | Rotate the view |
+| Scroll | Zoom in / out |
 
-### ディレクトリ構成
+### Directory Structure
 
 ```
 demo/
-  index.html          — エントリーポイント（HTML）
+  index.html          — Entry point (HTML)
   src/
-    main.ts           — デモ本体（ライブラリの使用例）
-    style.css         — UI スタイル
-  vite.config.ts      — 開発サーバー設定
+    main.ts           — Demo main (library usage example)
+    style.css         — UI styles
+  vite.config.ts      — Dev server config
   public/
-    audio/            — 音声ファイル（MP3）
+    audio/            — Audio files (MP3)
 ```
 
 ---
 
-## Cesium デモ
+## Cesium Demo
 
-### 起動方法
+### Getting Started
 
 ```bash
 npm install
 npm run dev:demo-cesium
 ```
 
-ブラウザで `http://localhost:5173/` を開き、**「オーディオを開始」** ボタンをクリックしてください。
+Open `http://localhost:5173/` in your browser and click the **"Start Audio"** button.
 
-> Cesium の全機能を利用する場合は [Cesium Ion](https://ion.cesium.com/) の無料アカウントで取得したアクセストークンが必要です。
-> デモでは国土地理院（GSI）タイルを使用するためトークンなしで動作します。
+> To use all Cesium features, you need an access token from a free [Cesium Ion](https://ion.cesium.com/) account.
+> The demo uses GSI (Geospatial Information Authority of Japan) tiles and works without a token.
 
-### 操作方法
+### Controls
 
-| 操作 | 内容 |
+| Input | Action |
 |---|---|
-| 左ドラッグ | 視点を回転 |
-| 右ドラッグ / 中ドラッグ | カメラを移動 |
-| スクロール | 高度を変更（ズームイン / アウト） |
+| Left drag | Rotate the view |
+| Right drag / Middle drag | Move the camera |
+| Scroll | Change altitude (zoom in / out) |
 
-Cesium は 3D 地球儀のため、カメラの **高度・仰角・方位** がすべて音響定位に影響します。
+Since Cesium renders a 3D globe, the camera's **altitude, tilt, and heading** all affect spatial audio positioning.
 
-### ディレクトリ構成
+### Directory Structure
 
 ```
 demo-cesium/
-  index.html          — エントリーポイント（Cesium CDN 読み込みを含む）
+  index.html          — Entry point (includes Cesium CDN script tag)
   src/
-    main.ts           — デモ本体
-    style.css         — UI スタイル
-  vite.config.ts      — 開発サーバー設定
-                        （音声ファイルは demo/public/ を共有）
+    main.ts           — Demo main
+    style.css         — UI styles
+  vite.config.ts      — Dev server config
+                        (audio files are shared from demo/public/)
 ```
 
-### Cesium の CDN 読み込みについて
+### Loading Cesium via CDN
 
-デモは Cesium を CDN から `<script>` タグで読み込みます。これにより `window.Cesium`（= `globalThis.Cesium`）が自動的に設定されます。
+The demo loads Cesium from a CDN `<script>` tag, which automatically sets `window.Cesium` (= `globalThis.Cesium`).
 
-`CesiumAdapter` には `viewer` と `Cesium` 名前空間を明示的に渡します。
+Pass both the `viewer` and the `Cesium` namespace explicitly to `CesiumAdapter`.
 
 ```ts
 import { GeospatialAudio, CesiumAdapter } from 'geospatial-audio-js';
 
-// declare const Cesium: any; （CDN 経由で window.Cesium が設定されている）
+// declare const Cesium: any; (window.Cesium is set via CDN)
 const audio = new GeospatialAudio(
   new CesiumAdapter(viewer, Cesium),
   { distanceModel: 'inverse', panningModel: 'HRTF' },
 );
 ```
 
-ESM バンドラーで Cesium を `import * as Cesium from 'cesium'` する場合もそのまま渡せます。
+If you bundle Cesium via ESM (`import * as Cesium from 'cesium'`), you can pass it the same way.
 
 ---
 
-## 共通: 画面構成
+## Common: UI Overview
 
-### ステータスパネル（右上）
+### Status Panel (top right)
 
-各音源の現在の状態をリアルタイムで表示します。
+Displays the current state of each sound source in real time.
 
-| 表示色 | 状態 |
+| Color | State |
 |---|---|
-| 🟢 緑 | 再生中 |
-| 🟡 黄 | 範囲外（カリングにより自動停止） |
-| ⚫ グレー | 読み込み中 / 停止中 |
-| 🔴 赤 | エラー |
+| Green | Playing |
+| Yellow | Out of range (automatically stopped by culling) |
+| Gray | Loading / stopped |
+| Red | Error |
 
-### 音源の可視化
+### Sound Source Visualization
 
-| デモ | 表示内容 |
+| Demo | Display |
 |---|---|
-| MapLibre | 橙色の円マーカー + 半透明のリング（GeoJSON レイヤー） |
-| Cesium | 色付きポイント + ラベル + 半透明の楕円（Cesium Entity） |
+| MapLibre | Orange circle markers + semi-transparent rings (GeoJSON layer) |
+| Cesium | Colored points + labels + semi-transparent ellipses (Cesium Entity) |
 
 ---
 
-## コード解説
+## Code Walkthrough
 
-### 1. GeospatialAudio の初期化
+### 1. Initializing GeospatialAudio
 
 ```ts
 import { GeospatialAudio, MapLibreAdapter, CesiumAdapter } from 'geospatial-audio-js';
@@ -148,50 +148,50 @@ const audio = new GeospatialAudio(new CesiumAdapter(viewer, Cesium), {
 });
 ```
 
-アダプターを明示的に生成して渡します。どちらのライブラリでも `GeospatialAudio` の API は同一です。
+Adapters are created explicitly and passed to the constructor. The `GeospatialAudio` API is identical regardless of which map library you use.
 
-### 2. 音源の追加
+### 2. Adding Sound Sources
 
 ```ts
 await audio.addSound({
   id: 'wave',
-  position: [139.052, 37.940],  // [経度, 緯度]
+  position: [139.052, 37.940],  // [longitude, latitude]
   url: 'audio/wave.mp3',
   loop: true,
   autoplay: true,
   pannerOptions: {
-    refDistance: 10,            // この距離（m）で基準音量
-    maxDistance: 100,           // PannerNode の最大距離
-    rolloffFactor: 1.5,         // 距離減衰の速さ
+    refDistance: 10,            // distance (m) at which volume equals 1.0
+    maxDistance: 100,           // maximum distance for PannerNode
+    rolloffFactor: 1.5,         // rate of distance attenuation
   },
 });
 ```
 
-`addSound()` は音声ファイルを `fetch` してデコードし、PannerNode に接続するまでを非同期で行います。同じ URL は内部でキャッシュされます。
+`addSound()` asynchronously fetches and decodes the audio file, then connects it to a PannerNode. The same URL is cached internally.
 
-### 3. 初期化（AudioContext の解放）
+### 3. Initialization (Resuming the AudioContext)
 
 ```ts
 startBtn.addEventListener('click', async () => {
-  await audio.initialize(); // AudioContext の resume() + 地図との同期
+  await audio.initialize(); // resume AudioContext + sync with map
   await audio.addSound(...);
 });
 ```
 
-ブラウザの Autoplay 制限により、`AudioContext` はユーザー操作後でないと動作しません。
+Due to browser autoplay restrictions, the `AudioContext` cannot run until after a user gesture.
 
-### 4. イベントでステータス表示を更新
+### 4. Updating UI State via Events
 
 ```ts
 audio.on('soundPlaying',  (id) => setState(id, 'playing'));
-audio.on('soundCulled',   (id) => setState(id, 'culled'));   // 範囲外に出た
-audio.on('soundUnculled', (id) => setState(id, 'playing')); // 範囲内に戻った
+audio.on('soundCulled',   (id) => setState(id, 'culled'));   // went out of range
+audio.on('soundUnculled', (id) => setState(id, 'playing')); // came back in range
 audio.on('soundError',    (id) => setState(id, 'error'));
 ```
 
-### 5. Cesium Entity への可視化
+### 5. Cesium Entity Visualization
 
-ライブラリは音響処理のみを担当します。Cesium の可視化は `viewer.entities.add()` で実装します。
+The library handles only audio processing. Cesium visualization is implemented using `viewer.entities.add()`.
 
 ```ts
 viewer.entities.add({
@@ -201,10 +201,10 @@ viewer.entities.add({
     color: Cesium.Color.fromCssColorString('#e85d04'),
     heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
   },
-  label: { text: '🌊 波打ち際', ... },
+  label: { text: '🌊 Shoreline', ... },
 });
 
-// 聴取範囲のリング
+// Listening range ring
 viewer.entities.add({
   position: Cesium.Cartesian3.fromDegrees(lng, lat, 1),
   ellipse: {
@@ -218,25 +218,25 @@ viewer.entities.add({
 
 ---
 
-## 音源一覧
+## Sound Source Reference
 
-デモ共通の音源とパラメータです。
+Sound sources and parameters used across the demos.
 
-| ID | 名前 | refDistance | maxDistance | rolloffFactor |
+| ID | Name | refDistance | maxDistance | rolloffFactor |
 |---|---|---|---|---|
-| `wave` | 🌊 波打ち際 | 10m | 100m | 1.5 |
-| `aburazemi` | 🦗 アブラゼミ | 5m | 50m | 2.0 |
-| `minminzemi` | 🦗 ミンミンゼミ | 10m | 50m | 2.0 |
-| `umineko` | 🐦 ウミネコ | 10m | 100m | 1.0 |
-| `baseball` | ⚾ 野球の音 | 10m | 100m | 1.0 |
-| `intersection` | 🚦 交差点 | 10m | 100m | 1.5 |
+| `wave` | Shoreline waves | 10m | 100m | 1.5 |
+| `aburazemi` | Aburazemi cicada | 5m | 50m | 2.0 |
+| `minminzemi` | Minminzemi cicada | 10m | 50m | 2.0 |
+| `umineko` | Black-tailed gull | 10m | 100m | 1.0 |
+| `baseball` | Baseball sounds | 10m | 100m | 1.0 |
+| `intersection` | Intersection | 10m | 100m | 1.5 |
 
-- **refDistance** — この距離（m）で基準音量（1.0）になる
-- **maxDistance** — この距離（m）を超えると音が聴こえなくなる（カリングも同値を使用）
-- **rolloffFactor** — 値が大きいほど距離減衰が急峻になる
+- **refDistance** — distance (m) at which volume equals 1.0
+- **maxDistance** — beyond this distance (m), the sound becomes inaudible (also used as the culling distance)
+- **rolloffFactor** — higher values produce steeper distance attenuation
 
 ---
 
-## 参考
+## References
 
-- [Web Audio API — PannerNode（MDN）](https://developer.mozilla.org/ja/docs/Web/API/PannerNode)
+- [Web Audio API — PannerNode (MDN)](https://developer.mozilla.org/en-US/docs/Web/API/PannerNode)
