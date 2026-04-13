@@ -14,7 +14,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist/geospatial-audio-js.js",
+    "dist/geospatial-audio-js.umd.cjs",
+    "dist/index.d.ts",
+    "dist/src"
   ],
   "scripts": {
     "dev": "vite build --watch",
@@ -57,5 +60,14 @@
     "maplibre",
     "cesiumjs"
   ],
-  "license": "MIT"
+  "author": "hshntmk",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hshntmk/geospatial-audio-js.git"
+  },
+  "homepage": "https://github.com/hshntmk/geospatial-audio-js#readme",
+  "bugs": {
+    "url": "https://github.com/hshntmk/geospatial-audio-js/issues"
+  }
 }

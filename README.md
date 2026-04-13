@@ -12,6 +12,12 @@ Places geographically-positioned sound sources in 3D space using the Web Audio A
 - **Reverb** — Room, hall, and outdoor presets, or custom IR for environmental acoustics
 - **Distance culling** — Automatically stops and resumes sound sources beyond a specified distance
 
+## Installation
+
+```bash
+npm install geospatial-audio-js
+```
+
 ## Quick Start
 
 ### MapLibre GL JS
