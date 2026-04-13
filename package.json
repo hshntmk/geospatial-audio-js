@@ -54,7 +54,8 @@
     "3d-audio",
     "spatial-audio",
     "web-audio",
-    "maplibre"
+    "maplibre",
+    "cesiumjs"
   ],
   "license": "MIT"
 }
