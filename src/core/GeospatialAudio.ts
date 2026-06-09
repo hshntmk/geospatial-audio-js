@@ -7,6 +7,7 @@ import type {
   ScaleConfig,
   LogLevel,
   ReverbConfig,
+  DopplerConfig,
   DebugConfig,
   DebugInfo,
 } from '../types/index.js';
@@ -14,6 +15,7 @@ import { AudioEngine } from './AudioEngine.js';
 import { SoundManager } from './SoundManager.js';
 import { ListenerManager } from './ListenerManager.js';
 import { PerformanceOptimizer } from './PerformanceOptimizer.js';
+import { DopplerController } from './DopplerController.js';
 import { DebugHelper } from './DebugHelper.js';
 import type { MapAdapter } from '../adapters/MapAdapter.js';
 import { CoordinateConverter } from '../utils/CoordinateConverter.js';
@@ -43,6 +45,7 @@ export class GeospatialAudio {
   private soundManager: SoundManager;
   private listenerManager: ListenerManager;
   private performanceOptimizer: PerformanceOptimizer;
+  private dopplerController: DopplerController;
   private debugHelper: DebugHelper;
 
   /** Bound handler kept so we can remove it in dispose(). */
@@ -69,6 +72,11 @@ export class GeospatialAudio {
       this.listenerManager,
       this.coordinateConverter,
       this.eventEmitter,
+    );
+    this.dopplerController = new DopplerController(
+      this.soundManager,
+      this.listenerManager,
+      this.coordinateConverter,
     );
     this.debugHelper = new DebugHelper(
       this.soundManager,
@@ -109,6 +117,7 @@ export class GeospatialAudio {
       this.mapAdapter.off(ev, this.onMapChange);
     });
     this.performanceOptimizer.dispose();
+    this.dopplerController.dispose();
     this.soundManager.dispose();
     this.audioEngine.dispose();
     this.eventEmitter.emit('disposed');
@@ -208,6 +217,18 @@ export class GeospatialAudio {
 
   setMasterVolume(volume: number): void {
     this.audioEngine.setMasterVolume(volume);
+  }
+
+  // ── Doppler ──────────────────────────────────────────────────────────────
+
+  /**
+   * Enables or updates the Doppler effect. The pitch shift is derived
+   * automatically from how the distance to each playing sound changes, so it
+   * follows both moving sounds (updateSoundPosition) and listener/map movement.
+   * Pass `{ enabled: false }` to disable and restore neutral pitch.
+   */
+  setDopplerEffect(config: DopplerConfig): void {
+    this.dopplerController.setConfig(config);
   }
 
   // ── Debug ────────────────────────────────────────────────────────────────

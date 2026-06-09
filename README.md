@@ -10,6 +10,7 @@ Places geographically-positioned sound sources in 3D space using the Web Audio A
 - **Map library agnostic** — Adapter pattern supports MapLibre GL JS, Leaflet, and Cesium
 - **Web Audio API based** — High-quality 3D audio via HRTF
 - **Reverb** — Room, hall, and outdoor presets, or custom IR for environmental acoustics
+- **Doppler effect** — Pitch shift derived automatically from listener/source movement
 - **Distance culling** — Automatically stops and resumes sound sources beyond a specified distance
 
 ## Installation
@@ -135,6 +136,20 @@ audio.setReverb({
 
 // Disable reverb
 audio.disableReverb();
+```
+
+### Doppler Effect
+
+```ts
+// Enable — pitch shift is derived automatically from how the distance
+// to each playing sound changes (moving sounds and map movement alike)
+audio.setDopplerEffect({ enabled: true });
+
+// Exaggerate the effect
+audio.setDopplerEffect({ enabled: true, dopplerFactor: 1.5 });
+
+// Disable
+audio.setDopplerEffect({ enabled: false });
 ```
 
 ### Master Volume

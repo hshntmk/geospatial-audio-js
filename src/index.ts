@@ -24,6 +24,7 @@ export type {
   // Phase 2
   ReverbConfig,
   ReverbPreset,
+  DopplerConfig,
   DebugConfig,
   DebugInfo,
   SoundDebugInfo,

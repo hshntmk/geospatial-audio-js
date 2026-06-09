@@ -235,6 +235,8 @@ Sound sources and parameters used across the demos.
 - **maxDistance** — beyond this distance (m), the sound becomes inaudible (also used as the culling distance)
 - **rolloffFactor** — higher values produce steeper distance attenuation
 
+All audio files used in the demos are sourced from [効果音ラボ (Soundeffect-Lab)](https://soundeffect-lab.info/).
+
 ---
 
 ## References

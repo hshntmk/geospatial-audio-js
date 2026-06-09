@@ -8,6 +8,7 @@ Web地図ライブラリに3D音響機能を追加する汎用JavaScriptライ�
 - **地図ライブラリ非依存** — アダプターパターンで MapLibre GL JS・Leaflet・Cesium に対応
 - **Web Audio API ベース** — HRTF による高品質な3D音響
 - **リバーブ** — 部屋・ホール・屋外プリセット、またはカスタム IR による環境音響
+- **ドップラー効果** — リスナー／音源の移動から自動算出されるピッチシフト
 - **距離カリング** — 指定距離以上の音源を自動停止・再開
 
 ## インストール
@@ -133,6 +134,20 @@ audio.setReverb({
 
 // リバーブを無効化
 audio.disableReverb();
+```
+
+### ドップラー効果
+
+```ts
+// 有効化 — ピッチシフトは各再生中の音源との距離変化から自動算出されます
+//（移動する音源・地図移動の両方に追従）
+audio.setDopplerEffect({ enabled: true });
+
+// 効果を強調
+audio.setDopplerEffect({ enabled: true, dopplerFactor: 1.5 });
+
+// 無効化
+audio.setDopplerEffect({ enabled: false });
 ```
 
 ### マスターボリューム

@@ -6,6 +6,9 @@
 
 class MockAudioParam {
   value = 0;
+  setTargetAtTime(target: number, _startTime: number, _timeConstant: number) {
+    this.value = target;
+  }
 }
 
 class MockAudioNode {
@@ -34,6 +37,7 @@ class MockPannerNode extends MockAudioNode {
 class MockAudioBufferSourceNode extends MockAudioNode {
   buffer: AudioBuffer | null = null;
   loop = false;
+  playbackRate = new MockAudioParam();
   onended: (() => void) | null = null;
   start(_offset?: number, _when?: number) {}
   stop() { this.onended?.(); }

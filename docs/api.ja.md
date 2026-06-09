@@ -11,13 +11,14 @@
 3. [音源管理](#音源管理)
 4. [リスナー管理](#リスナー管理)
 5. [リバーブ](#リバーブ)
-6. [マスターボリューム](#マスターボリューム)
-7. [パフォーマンス最適化](#パフォーマンス最適化)
-8. [スケール調整](#スケール調整)
-9. [デバッグ](#デバッグ)
-10. [ログ](#ログ)
-11. [イベント](#イベント)
-12. [型定義](#型定義)
+6. [ドップラー効果](#ドップラー効果)
+7. [マスターボリューム](#マスターボリューム)
+8. [パフォーマンス最適化](#パフォーマンス最適化)
+9. [スケール調整](#スケール調整)
+10. [デバッグ](#デバッグ)
+11. [ログ](#ログ)
+12. [イベント](#イベント)
+13. [型定義](#型定義)
 
 ---
 
@@ -279,6 +280,58 @@ masterGain ─┬─ dryGain ─────────────── desti
 
 ---
 
+## ドップラー効果
+
+### `setDopplerEffect(config: DopplerConfig): void`
+
+ドップラーによるピッチシフトを設定します。視線方向の相対速度は、各再生中の音源とリスナーの**距離変化から自動的に算出**されるため、音源の移動（`updateSoundPosition`）とリスナー／地図の移動の両方に追従します。速度を自分で渡す必要はありません。`{ enabled: false }` を渡すと無効化され、ピッチが元に戻ります。
+
+```ts
+// デフォルト値で有効化
+audio.setDopplerEffect({ enabled: true });
+
+// 効果を強調し、音速を指定
+audio.setDopplerEffect({ enabled: true, dopplerFactor: 1.5, speedOfSound: 340 });
+
+// 無効化
+audio.setDopplerEffect({ enabled: false });
+```
+
+#### DopplerConfig
+
+```ts
+interface DopplerConfig {
+  enabled:         boolean;
+  speedOfSound?:   number;  // m/s、デフォルト: 343.3
+  dopplerFactor?:  number;  // 効果の強さ（0 で無効）、デフォルト: 1.0
+  updateInterval?: number;  // 相対速度のサンプリング間隔(ms)、デフォルト: 100
+  maxPitchRatio?:  number;  // クランプ。[1/ratio, ratio] として適用、デフォルト: 2.0
+  smoothing?:      number;  // setTargetAtTime の時定数(秒)、デフォルト: 0.05
+  listenerMotion?: boolean; // カメラ／地図の移動でピッチを変えるか、デフォルト: true
+}
+```
+
+**`listenerMotion`** は、リスナー（カメラ／地図）の移動をピッチシフトに反映するかどうかを制御します。
+
+| 値 | 挙動 |
+|---|---|
+| `true`（デフォルト） | 物理的に正確。音源**と**リスナーの両方の動きでピッチが変化します。 |
+| `false` | 音源自身の動きのみでピッチが変化します。地図／カメラを操作してもピッチは一定で、ナビゲーション中の耳障りな揺れを防ぎます。 |
+
+`false` のとき、ピッチ変化は「音源の速度ベクトルをリスナー→音源の視線方向に射影した成分」から求められ、リスナー自身の速度は無視されます。なお、左右の定位や距離減衰は従来どおりカメラに追従し、**ピッチのみ**が一定に保たれます。
+
+**仕組み:** 各音源の `playbackRate` に適用されるピッチ比は次式で求めます。
+
+```
+ratio = speedOfSound / (speedOfSound + dopplerFactor × dr/dt)
+```
+
+`dr/dt` は距離の変化率です（正＝離れる→ピッチ低下、負＝近づく→ピッチ上昇）。
+
+> **注意:** ピッチシフトに `AudioBufferSourceNode.playbackRate` を使うため、ピッチだけでなく再生速度も変化します。ループ音（サイレン・エンジン音）には自然ですが、ワンショット音では持続音で最も効果がわかります。Web Audio API のネイティブ・ドップラー（`PannerNode.setVelocity`）は仕様から削除済みのため、本ライブラリ内で計算しています。
+
+---
+
 ## マスターボリューム
 
 ### `setMasterVolume(volume: number): void`
@@ -522,6 +575,7 @@ export type {
   ScaleConfig, OptimizationConfig,
   LogLevel, PanningModelType, DistanceModelType,
   ReverbConfig, ReverbPreset,
+  DopplerConfig,
   DebugConfig, DebugInfo, SoundDebugInfo,
   MapAdapter, MapEvent,
 } from 'geospatial-audio-js';

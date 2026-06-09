@@ -22,6 +22,8 @@ export class SoundSource extends EventEmitter {
   private _audioPosition: Vector3 = { x: 0, y: 0, z: 0 };
   private startTime = 0;
   private pauseOffset = 0;
+  /** Current Doppler pitch ratio; persisted so it survives source re-creation. */
+  private _playbackRate = 1;
 
   constructor(
     id: string,
@@ -49,6 +51,7 @@ export class SoundSource extends EventEmitter {
     this.source = ctx.createBufferSource();
     this.source.buffer = this.audioBuffer;
     this.source.loop = this.config.loop ?? false;
+    this.source.playbackRate.value = this._playbackRate;
     this.source.connect(this.panner);
 
     const offset = this._state === 'paused' ? this.pauseOffset : 0;
@@ -106,6 +109,29 @@ export class SoundSource extends EventEmitter {
 
   setVolume(volume: number): void {
     this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
+  }
+
+  /**
+   * Sets the Doppler playback-rate ratio (1 = no shift, >1 = higher pitch).
+   * Applied to the live source with optional setTargetAtTime smoothing; the
+   * value is remembered so it is re-applied when the source is re-created
+   * (e.g. after culling resumes playback).
+   */
+  setPlaybackRate(rate: number, smoothing = 0): void {
+    this._playbackRate = rate;
+    if (!this.source) return;
+
+    const param = this.source.playbackRate;
+    const setTarget = (param as AudioParam).setTargetAtTime;
+    if (smoothing > 0 && typeof setTarget === 'function') {
+      param.setTargetAtTime(rate, this.audioEngine.getContext().currentTime, smoothing);
+    } else {
+      param.value = rate;
+    }
+  }
+
+  getPlaybackRate(): number {
+    return this._playbackRate;
   }
 
   getVolume(): number {

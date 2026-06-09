@@ -279,6 +279,58 @@ Disables reverb and restores the audio graph to its original routing.
 
 ---
 
+## Doppler Effect
+
+### `setDopplerEffect(config: DopplerConfig): void`
+
+Enables or updates the Doppler pitch shift. The radial velocity is derived **automatically** from how the distance to each playing sound changes, so it follows both moving sounds (`updateSoundPosition`) and listener/map movement — no need to supply velocities yourself. Pass `{ enabled: false }` to disable and restore neutral pitch.
+
+```ts
+// Enable with defaults
+audio.setDopplerEffect({ enabled: true });
+
+// Exaggerate the effect and use a custom speed of sound
+audio.setDopplerEffect({ enabled: true, dopplerFactor: 1.5, speedOfSound: 340 });
+
+// Disable
+audio.setDopplerEffect({ enabled: false });
+```
+
+#### DopplerConfig
+
+```ts
+interface DopplerConfig {
+  enabled:         boolean;
+  speedOfSound?:   number;  // m/s, default: 343.3
+  dopplerFactor?:  number;  // strength multiplier (0 = none), default: 1.0
+  updateInterval?: number;  // radial-velocity sampling interval (ms), default: 100
+  maxPitchRatio?:  number;  // clamp, applied as [1/ratio, ratio], default: 2.0
+  smoothing?:      number;  // setTargetAtTime time constant (s), default: 0.05
+  listenerMotion?: boolean; // whether camera/map motion shifts pitch, default: true
+}
+```
+
+**`listenerMotion`** controls whether listener (camera/map) movement contributes to the pitch shift:
+
+| value | behaviour |
+|---|---|
+| `true` (default) | Physically correct — both source **and** listener motion shift pitch. |
+| `false` | Only the sound source's own motion shifts pitch. Panning the map/camera leaves pitch unchanged, avoiding "noisy" shifts during navigation. |
+
+With `false`, the shift comes from the source's velocity projected onto the listener→source line of sight; the listener's own velocity is ignored. Note that left/right panning and distance attenuation still follow the camera as usual — only the pitch is held steady.
+
+**How it works:** the pitch ratio applied to each source's `playbackRate` is
+
+```
+ratio = speedOfSound / (speedOfSound + dopplerFactor × dr/dt)
+```
+
+where `dr/dt` is the rate of change of distance (positive = receding → lower pitch; negative = approaching → higher pitch).
+
+> **Note:** Because the shift uses `AudioBufferSourceNode.playbackRate`, it changes playback speed as well as pitch. This is natural for looping sounds (sirens, engines); for one-shot clips the effect is most noticeable on sustained tones. The native Web Audio Doppler (`PannerNode.setVelocity`) was removed from the spec, so this is computed in-library.
+
+---
+
 ## Master Volume
 
 ### `setMasterVolume(volume: number): void`
@@ -522,6 +574,7 @@ export type {
   ScaleConfig, OptimizationConfig,
   LogLevel, PanningModelType, DistanceModelType,
   ReverbConfig, ReverbPreset,
+  DopplerConfig,
   DebugConfig, DebugInfo, SoundDebugInfo,
   MapAdapter, MapEvent,
 } from 'geospatial-audio-js';

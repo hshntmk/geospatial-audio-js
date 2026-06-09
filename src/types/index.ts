@@ -110,6 +110,36 @@ export interface ReverbConfig {
   customIR?: AudioBuffer;
 }
 
+// ---- Doppler ----
+
+export interface DopplerConfig {
+  enabled: boolean;
+  /** Speed of sound in m/s. Default: 343.3 */
+  speedOfSound?: number;
+  /** Scales the strength of the pitch shift (0 = none). Default: 1.0 */
+  dopplerFactor?: number;
+  /** How often (ms) the radial velocity is sampled. Default: 100 */
+  updateInterval?: number;
+  /**
+   * Clamp for the playback-rate ratio, applied symmetrically as
+   * [1 / maxPitchRatio, maxPitchRatio]. Prevents extreme shifts from
+   * position jumps. Default: 2.0
+   */
+  maxPitchRatio?: number;
+  /**
+   * Time constant (seconds) for AudioParam.setTargetAtTime smoothing.
+   * Larger = smoother but laggier. Default: 0.05
+   */
+  smoothing?: number;
+  /**
+   * Whether listener (camera/map) motion contributes to the pitch shift.
+   * - `true`  (default): physically correct — both source and listener motion shift pitch.
+   * - `false`: only the sound source's own motion shifts pitch; moving the camera
+   *   leaves pitch unchanged (avoids "noisy" shifts when panning the map).
+   */
+  listenerMotion?: boolean;
+}
+
 // ---- Debug ----
 
 export interface DebugConfig {

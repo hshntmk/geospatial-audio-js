@@ -235,6 +235,8 @@ viewer.entities.add({
 - **maxDistance** — この距離（m）を超えると音が聴こえなくなる（カリングも同値を使用）
 - **rolloffFactor** — 値が大きいほど距離減衰が急峻になる
 
+デモで使用している音声ファイルはすべて [効果音ラボ](https://soundeffect-lab.info/) 様の素材を使用しています。
+
 ---
 
 ## 参考
