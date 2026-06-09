@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>geospatial-audio-js — ドップラー効果デモ (Cesium)</title>
+
+  <script>
+    window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/';
+  </script>
+  <link rel="stylesheet"
+        href="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Widgets/widgets.css" />
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Cesium.js"></script>
+</head>
+<body>
+
+  <div id="cesiumContainer"></div>
+
+  <!-- Start overlay -->
+  <div id="overlay">
+    <div class="card">
+      <h1>🔊 ドップラー効果デモ<br><small>Cesium / 試作</small></h1>
+      <p>
+        合成したホーン音の音源が、視点の前を高速で<strong>往復</strong>します。<br>
+        近づくと音が<strong>高く</strong>、遠ざかると<strong>低く</strong>聞こえます。
+      </p>
+      <p class="note">
+        ※ ヘッドフォン推奨。<br>
+        ※ 音源はデモ共通の音声ファイルを使用します。持続音（セミなど）の方がピッチ変化が分かりやすいです。
+      </p>
+      <button id="start-btn">🎧 オーディオを開始</button>
+    </div>
+  </div>
+
+  <!-- Control / readout panel (bottom-left) -->
+  <div id="control-panel">
+    <p class="panel-title">ドップラー</p>
+
+    <div class="slider-row">
+      <label for="sound-select">音源</label>
+      <select id="sound-select">
+        <option value="aburazemi.mp3">🦗 アブラゼミ（持続音）</option>
+        <option value="minminzemi.mp3">🦗 ミンミンゼミ（持続音）</option>
+        <option value="intersection.mp3">🚦 交差点</option>
+        <option value="baseball.mp3">⚾ 野球</option>
+        <option value="wave.mp3">🌊 波</option>
+        <option value="umineko.mp3">🐦 ウミネコ</option>
+      </select>
+    </div>
+
+    <label class="toggle">
+      <input type="checkbox" id="doppler-toggle" checked />
+      効果を有効化
+    </label>
+
+    <label class="toggle">
+      <input type="checkbox" id="listener-motion-toggle" />
+      カメラ移動でもピッチを変える
+    </label>
+
+    <div class="slider-row">
+      <label for="speed">音源の速度</label>
+      <input type="range" id="speed" min="10" max="120" step="5" value="60" />
+      <span id="speed-val">60</span> m/s
+    </div>
+
+    <div class="slider-row">
+      <label for="factor">効果の強さ (dopplerFactor)</label>
+      <input type="range" id="factor" min="0" max="3" step="0.1" value="1" />
+      <span id="factor-val">1.0</span>×
+    </div>
+
+    <hr />
+
+    <div class="readout">
+      <p>距離: <span id="r-dist">—</span> m</p>
+      <p>視線速度 (dr/dt): <span id="r-vel">—</span> m/s</p>
+      <p>ピッチ比: <span id="r-ratio" class="ratio">—</span> <span id="r-arrow"></span></p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
