@@ -332,6 +332,49 @@ ratio = speedOfSound / (speedOfSound + dopplerFactor × dr/dt)
 
 ---
 
+## 音の伝搬遅延
+
+### `setPropagationDelay(config: PropagationDelayConfig): void`
+
+音の伝搬遅延（音速による到達遅延）を設定します。各音源は `distance / speedOfSound` 秒だけ遅延して聞こえるようになり、遠い音ほど実際の音の伝わり方に近い形で遅れて届きます。遅延時間は `setDopplerEffect` と同様に距離から**自動的に算出**され、音源の移動・リスナー／地図の移動の両方に追従します。`{ enabled: false }` を渡すと無効化され、遅延がゼロに戻ります。
+
+```ts
+// デフォルト値で有効化
+audio.setPropagationDelay({ enabled: true });
+
+// 音速を指定し、広いシーン向けに遅延上限を大きくする
+audio.setPropagationDelay({ enabled: true, speedOfSound: 340, maxDelayTime: 10 });
+
+// 無効化
+audio.setPropagationDelay({ enabled: false });
+```
+
+#### PropagationDelayConfig
+
+```ts
+interface PropagationDelayConfig {
+  enabled:         boolean;
+  speedOfSound?:   number;  // m/s、デフォルト: 343.3
+  updateInterval?: number;  // 距離のサンプリング間隔(ms)、デフォルト: 100
+  maxDelayTime?:   number;  // 遅延の上限(秒) = DelayNode の容量、デフォルト: 5
+  smoothing?:      number;  // setTargetAtTime の時定数(秒)、デフォルト: 0.1
+  jumpThreshold?:  number;  // スナップ（瞬時反映）を発動する距離の変化量(m)、デフォルト: 500
+}
+```
+
+**仕組み:** 各音源のオーディオは `DelayNode` を通過し、その遅延時間は `min(distance / speedOfSound, maxDelayTime)` に設定されます。更新のたびに直前のサンプルとの距離変化を比較します。
+
+| 距離の変化量 | 挙動 |
+|---|---|
+| `jumpThreshold` 以下 | 連続的な移動（地図のパン、音源の移動）— `AudioParam.setTargetAtTime` により**なめらかにランプ**します。 |
+| `jumpThreshold` を超える | 不連続な変化（`flyTo`／`setView`、`updateSoundPosition` による音源のテレポート）— 遅延を**瞬時にスナップ**し、ジャンプをまたいで不自然に音が伸び縮みするのを防ぎます。 |
+
+> **注意:** `maxDelayTime` は `DelayNode` 生成時に固定される容量を決めるため、値を大きくしても効果があるのは**変更後に追加した音源のみ**です。既存の音源は生成時点の容量のまま残ります。`maxDelayTime * speedOfSound` より遠い音源は、遅延がそれ以上伸びずに上限でクランプされます。広いシーンでは `maxDelayTime` を大きくしてください（音源ごとの遅延バッファが大きくなる分、メモリ消費は増えます）。
+>
+> `setDopplerEffect` とは独立しており、両方同時に有効化できます。片方は到達時刻を遅らせ、もう片方はピッチを変化させるため、組み合わせることでどちらか単体よりも実際の音の伝搬に近い表現になります。
+
+---
+
 ## マスターボリューム
 
 ### `setMasterVolume(volume: number): void`
@@ -540,19 +583,28 @@ interface Orientation { bearing: number; pitch: number; roll: number; }
 ### アダプター
 
 ```ts
-/** 対応する地図イベントの種別 */
-type MapEvent = 'move' | 'rotate' | 'zoom' | 'pitch';
-
 interface MapAdapter {
   getCenter(): Position;
   getZoom(): number;
+  /** 方位角（度）: 0 = 北、時計回り */
   getBearing(): number;
+  /**
+   * リスナーのピッチ（仰角・度）: 0 = 水平、正 = 上向き、負 = 下向き。
+   * 平面地図アダプター（MapLibre, Leaflet）はリスナーが地上に立つモデルの
+   * ため常に 0 を返します。Cesium はカメラの仰角を返します。
+   */
   getPitch(): number;
   getRoll?(): number;
   project(lngLat: [number, number]): { x: number; y: number };
   unproject(point: { x: number; y: number }): [number, number];
-  on(event: MapEvent, handler: () => void): void;
-  off(event: MapEvent, handler: () => void): void;
+  /**
+   * カメラ（視点）が何らかの理由で変化したとき（パン・回転・ズーム・ピッチ）
+   * に呼ばれるハンドラを登録します。地図ライブラリ固有のイベント群は
+   * アダプターがこの単一の通知に束ねます。
+   */
+  onCameraChange(handler: () => void): void;
+  /** 登録済みのカメラ変更ハンドラを解除します。 */
+  offCameraChange(handler: () => void): void;
   getMetersPerPixel(lat: number, zoom: number): number;
   getLibraryName(): string;
 }
@@ -576,7 +628,8 @@ export type {
   LogLevel, PanningModelType, DistanceModelType,
   ReverbConfig, ReverbPreset,
   DopplerConfig,
+  PropagationDelayConfig,
   DebugConfig, DebugInfo, SoundDebugInfo,
-  MapAdapter, MapEvent,
+  MapAdapter,
 } from 'geospatial-audio-js';
 ```

@@ -14,6 +14,7 @@ export class SoundSource extends EventEmitter {
   private audioEngine: AudioEngine;
 
   private source: AudioBufferSourceNode | null = null;
+  private delayNode: DelayNode;
   private panner: PannerNode;
   private gainNode: GainNode;
 
@@ -39,7 +40,9 @@ export class SoundSource extends EventEmitter {
     this._geoPosition = { lng: config.position[0], lat: config.position[1], alt: config.position[2] };
 
     this.panner = audioEngine.createPannerNode(config.pannerOptions);
+    this.delayNode = audioEngine.createDelayNode();
     this.gainNode = audioEngine.createGainNode(config.volume ?? 1.0);
+    this.delayNode.connect(this.panner);
     this.panner.connect(this.gainNode);
     this.gainNode.connect(audioEngine.getMasterGain());
   }
@@ -52,9 +55,15 @@ export class SoundSource extends EventEmitter {
     this.source.buffer = this.audioBuffer;
     this.source.loop = this.config.loop ?? false;
     this.source.playbackRate.value = this._playbackRate;
-    this.source.connect(this.panner);
+    this.source.connect(this.delayNode);
 
-    const offset = this._state === 'paused' ? this.pauseOffset : 0;
+    const rawOffset = this._state === 'paused' ? this.pauseOffset : 0;
+    // Looped sources accumulate pauseOffset past buffer.duration; normalise so
+    // the browser doesn't receive an out-of-range offset (undefined behaviour).
+    const offset =
+      this.config.loop && this.audioBuffer.duration > 0
+        ? rawOffset % this.audioBuffer.duration
+        : rawOffset;
     this.source.start(0, offset);
     this.startTime = ctx.currentTime - offset;
     this._state = 'playing';
@@ -134,6 +143,31 @@ export class SoundSource extends EventEmitter {
     return this._playbackRate;
   }
 
+  /**
+   * Sets the propagation-delay time (seconds it takes the sound to travel
+   * from the source to the listener). With `smoothing > 0` the change is
+   * ramped via setTargetAtTime for continuous motion; with `smoothing = 0`
+   * (default) it is applied instantly — used to snap across discontinuities
+   * (map jumps, teleported sounds) instead of sweeping the delay audibly.
+   * Clamped to the node's fixed capacity (see AudioEngine.createDelayNode).
+   */
+  setPropagationDelay(delaySeconds: number, smoothing = 0): void {
+    const clamped = Math.max(0, Math.min(delaySeconds, this.delayNode.delayTime.maxValue));
+    const param = this.delayNode.delayTime;
+    const ctx = this.audioEngine.getContext();
+    const setTarget = (param as AudioParam).setTargetAtTime;
+    if (smoothing > 0 && typeof setTarget === 'function') {
+      param.setTargetAtTime(clamped, ctx.currentTime, smoothing);
+    } else {
+      param.cancelScheduledValues(ctx.currentTime);
+      param.value = clamped;
+    }
+  }
+
+  getPropagationDelay(): number {
+    return this.delayNode.delayTime.value;
+  }
+
   getVolume(): number {
     return this.gainNode.gain.value;
   }
@@ -156,6 +190,7 @@ export class SoundSource extends EventEmitter {
 
   dispose(): void {
     this.stop();
+    this.delayNode.disconnect();
     this.panner.disconnect();
     this.gainNode.disconnect();
     this.removeAllListeners();

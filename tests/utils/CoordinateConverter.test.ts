@@ -13,8 +13,8 @@ function makeMockAdapter(overrides?: Partial<MapAdapter>): MapAdapter {
     getPitch: () => 0,
     project: ([lng, lat]) => ({ x: lng * 1000, y: lat * 1000 }),
     unproject: ({ x, y }) => [x / 1000, y / 1000],
-    on: () => {},
-    off: () => {},
+    onCameraChange: () => {},
+    offCameraChange: () => {},
     getMetersPerPixel: () => 4.77,
     getLibraryName: () => 'mock',
     ...overrides,
@@ -68,6 +68,19 @@ describe('CoordinateConverter', () => {
       );
       // sound at ground (alt=0), listener at 500 m → Y = -500
       expect(converter.geoToAudio({ lng: 0, lat: 0, alt: 0 }).y).toBeCloseTo(-500);
+    });
+
+    it('uses the origin provider instead of the map center once set', () => {
+      const converter = new CoordinateConverter(makeMockAdapter());
+      converter.setOriginProvider(() => ({ lng: 0.001, lat: 0, alt: 0 }));
+      // Sound at the provider's origin → audio-space origin, even though
+      // the map center is still (0, 0)
+      const atOrigin = converter.geoToAudio({ lng: 0.001, lat: 0 });
+      expect(atOrigin.x).toBeCloseTo(0);
+      expect(atOrigin.z).toBeCloseTo(0);
+      // Map center is now 0.001° west of the listener
+      const atCenter = converter.geoToAudio({ lng: 0, lat: 0 });
+      expect(atCenter.x).toBeCloseTo(-0.001 * M_PER_DEG_LNG, 1);
     });
 
     it('applies horizontal scale correctly', () => {

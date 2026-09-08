@@ -1,6 +1,7 @@
 import type { SoundConfig, SoundState, Position } from '../types/index.js';
 import type { AudioEngine } from './AudioEngine.js';
 import type { CoordinateConverter } from '../utils/CoordinateConverter.js';
+import type { DebugHelper } from './DebugHelper.js';
 import { SoundSource } from './SoundSource.js';
 import { EventEmitter } from '../utils/EventEmitter.js';
 import { logger } from '../utils/Logger.js';
@@ -16,6 +17,8 @@ export class SoundManager {
   private audioEngine: AudioEngine;
   private coordinateConverter: CoordinateConverter;
   private eventEmitter: EventEmitter;
+  /** Wired by GeospatialAudio after construction (DebugHelper depends on this class). */
+  private debugHelper: DebugHelper | null = null;
 
   constructor(
     audioEngine: AudioEngine,
@@ -79,13 +82,19 @@ export class SoundManager {
     sound.setGeoPosition(position);
     const pos: Position = { lng: position[0], lat: position[1], alt: position[2] };
     sound.setPosition(this.coordinateConverter.geoToAudio(pos));
+    this.debugHelper?.logSoundParams(id);
   }
 
   /** Re-computes 3D positions for all sounds (called when the map moves). */
   updateAllPositions(): void {
     this.sounds.forEach(sound => {
       sound.setPosition(this.coordinateConverter.geoToAudio(sound.geoPosition));
+      this.debugHelper?.logSoundParams(sound.id);
     });
+  }
+
+  setDebugHelper(debugHelper: DebugHelper): void {
+    this.debugHelper = debugHelper;
   }
 
   playSound(id: string): void {

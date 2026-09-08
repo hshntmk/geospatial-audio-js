@@ -99,7 +99,9 @@ export class DebugHelper {
     }
 
     const listenerPos = this.listenerManager.getCurrentPosition();
-    logger.info(`[Debug] Sound "${id}":`, {
+    // Deliberately bypasses the library log level: enabling logAudioParams is
+    // itself the opt-in, so the output must not also require setLogLevel().
+    console.info(`[geospatial-audio] [Debug] Sound "${id}":`, {
       state: sound.state,
       geoPosition: sound.geoPosition,
       audioPosition: sound.audioPosition,
@@ -127,6 +129,8 @@ export class DebugHelper {
 
     const avg =
       this.updateDurations.reduce((a, b) => a + b, 0) / this.updateDurations.length;
-    logger.debug(`[Debug] Update: ${duration.toFixed(2)}ms (avg ${avg.toFixed(2)}ms)`);
+    // console.info, not console.debug: browsers hide the verbose level by
+    // default, and logPerformance is already the opt-in gate.
+    console.info(`[geospatial-audio] [Debug] Update: ${duration.toFixed(2)}ms (avg ${avg.toFixed(2)}ms)`);
   }
 }

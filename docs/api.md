@@ -331,6 +331,49 @@ where `dr/dt` is the rate of change of distance (positive = receding → lower p
 
 ---
 
+## Propagation Delay
+
+### `setPropagationDelay(config: PropagationDelayConfig): void`
+
+Enables or updates the sound-propagation delay: each sound is delayed by `distance / speedOfSound`, so distant sounds arrive noticeably later — the way real sound travel works. The delay is derived **automatically** from distance and follows both moving sounds and listener/map movement, the same way `setDopplerEffect` does. Pass `{ enabled: false }` to disable and restore zero delay.
+
+```ts
+// Enable with defaults
+audio.setPropagationDelay({ enabled: true });
+
+// Custom speed of sound and a larger delay cap for a bigger scene
+audio.setPropagationDelay({ enabled: true, speedOfSound: 340, maxDelayTime: 10 });
+
+// Disable
+audio.setPropagationDelay({ enabled: false });
+```
+
+#### PropagationDelayConfig
+
+```ts
+interface PropagationDelayConfig {
+  enabled:         boolean;
+  speedOfSound?:   number;  // m/s, default: 343.3
+  updateInterval?: number;  // distance sampling interval (ms), default: 100
+  maxDelayTime?:   number;  // delay cap (s) = DelayNode capacity, default: 5
+  smoothing?:      number;  // setTargetAtTime time constant (s), default: 0.1
+  jumpThreshold?:  number;  // distance jump (m) that triggers a snap, default: 500
+}
+```
+
+**How it works:** each sound's audio passes through a `DelayNode` set to `min(distance / speedOfSound, maxDelayTime)`. On every update tick the controller compares the new distance to the previous sample:
+
+| distance change | behaviour |
+|---|---|
+| ≤ `jumpThreshold` | Continuous motion (panning the map, a moving sound) — the delay is **ramped** smoothly via `AudioParam.setTargetAtTime`. |
+| > `jumpThreshold` | A discontinuity (`flyTo`/`setView`, a sound teleported via `updateSoundPosition`) — the delay **snaps** instantly instead of sweeping audibly across the jump. |
+
+> **Note:** `maxDelayTime` sets a `DelayNode`'s fixed capacity at creation time, so raising it only affects sounds added *after* the change — existing sounds keep whatever capacity they were created with. Sounds farther than `maxDelayTime * speedOfSound` have their delay clamped rather than growing further; raise `maxDelayTime` for large scenes, at the cost of a larger delay buffer per sound.
+>
+> This is independent of `setDopplerEffect` — both can be enabled together, since one delays arrival time and the other shifts pitch. Combining them approximates real propagation more closely than either alone.
+
+---
+
 ## Master Volume
 
 ### `setMasterVolume(volume: number): void`
@@ -539,19 +582,29 @@ interface Orientation { bearing: number; pitch: number; roll: number; }
 ### Adapter
 
 ```ts
-/** Supported map event types */
-type MapEvent = 'move' | 'rotate' | 'zoom' | 'pitch';
-
 interface MapAdapter {
   getCenter(): Position;
   getZoom(): number;
+  /** Bearing in degrees: 0 = North, clockwise. */
   getBearing(): number;
+  /**
+   * Listener pitch as an elevation angle in degrees:
+   * 0 = horizontal, positive = up, negative = down.
+   * Flat-map adapters (MapLibre, Leaflet) return 0 — the listener stands on
+   * the ground; Cesium returns the camera's elevation angle.
+   */
   getPitch(): number;
   getRoll?(): number;
   project(lngLat: [number, number]): { x: number; y: number };
   unproject(point: { x: number; y: number }): [number, number];
-  on(event: MapEvent, handler: () => void): void;
-  off(event: MapEvent, handler: () => void): void;
+  /**
+   * Registers a handler invoked whenever the camera/view changes for any
+   * reason (pan, rotate, zoom, pitch). The adapter bundles the map library's
+   * native events into this single notification.
+   */
+  onCameraChange(handler: () => void): void;
+  /** Removes a previously registered camera-change handler. */
+  offCameraChange(handler: () => void): void;
   getMetersPerPixel(lat: number, zoom: number): number;
   getLibraryName(): string;
 }
@@ -575,7 +628,8 @@ export type {
   LogLevel, PanningModelType, DistanceModelType,
   ReverbConfig, ReverbPreset,
   DopplerConfig,
+  PropagationDelayConfig,
   DebugConfig, DebugInfo, SoundDebugInfo,
-  MapAdapter, MapEvent,
+  MapAdapter,
 } from 'geospatial-audio-js';
 ```

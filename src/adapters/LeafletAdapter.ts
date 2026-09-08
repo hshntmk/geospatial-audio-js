@@ -1,5 +1,5 @@
 import type { Position } from '../types/index.js';
-import type { MapAdapter, MapEvent } from './MapAdapter.js';
+import type { MapAdapter } from './MapAdapter.js';
 
 // Structural type — no hard dependency on the leaflet package.
 interface LeafletMap {
@@ -11,20 +11,15 @@ interface LeafletMap {
   off(event: string, handler: () => void): void;
 }
 
-// Leaflet fires different event names than our MapEvent type.
-// Bearing / pitch are not supported (always 0).
-const LEAFLET_EVENTS: Record<MapEvent, string[]> = {
-  move:   ['move'],
-  rotate: [],        // not supported — no-op
-  zoom:   ['zoom'],
-  pitch:  [],        // not supported — no-op
-};
+// Leaflet has no rotation or pitch; the camera only pans and zooms.
+// 'zoom' is registered alongside 'move' because a centered zoom animation
+// does not move the map center and so fires 'zoom' without 'move'.
+const LEAFLET_CAMERA_EVENTS = ['move', 'zoom'];
 
 /**
  * Adapter for Leaflet (v1 / v2).
  *
  * Leaflet is a 2D map library: bearing and pitch are always 0.
- * The `rotate` and `pitch` MapEvents are silently ignored.
  */
 export class LeafletAdapter implements MapAdapter {
   private map: LeafletMap;
@@ -61,12 +56,12 @@ export class LeafletAdapter implements MapAdapter {
     return [lng, lat];
   }
 
-  on(event: MapEvent, handler: () => void): void {
-    LEAFLET_EVENTS[event].forEach(e => this.map.on(e, handler));
+  onCameraChange(handler: () => void): void {
+    LEAFLET_CAMERA_EVENTS.forEach(e => this.map.on(e, handler));
   }
 
-  off(event: MapEvent, handler: () => void): void {
-    LEAFLET_EVENTS[event].forEach(e => this.map.off(e, handler));
+  offCameraChange(handler: () => void): void {
+    LEAFLET_CAMERA_EVENTS.forEach(e => this.map.off(e, handler));
   }
 
   getMetersPerPixel(lat: number, zoom: number): number {

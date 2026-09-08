@@ -1,5 +1,5 @@
 import type { Position } from '../types/index.js';
-import type { MapAdapter, MapEvent } from './MapAdapter.js';
+import type { MapAdapter } from './MapAdapter.js';
 
 // Structural types — no hard dependency on the cesium package.
 interface CesiumCartographic {
@@ -40,9 +40,6 @@ interface CesiumViewer {
  *
  * Cesium is a 3D globe library, so altitude is fully supported.
  * Zoom level is approximated from camera height.
- *
- * Because Cesium fires a single `moveEnd` event for all camera changes
- * (move, rotate, zoom, pitch), all four MapEvents are forwarded to it.
  */
 export class CesiumAdapter implements MapAdapter {
   private viewer: CesiumViewer;
@@ -79,13 +76,14 @@ export class CesiumAdapter implements MapAdapter {
   }
 
   /**
-   * Cesium pitch convention:
-   *   0       = horizontal
-   *  -Math.PI/2 = looking straight down
-   * Our convention: 0 = horizontal, 90 = looking straight up.
+   * Cesium's pitch is already an elevation angle (0 = horizontal,
+   * -π/2 = straight down), which is exactly the MapAdapter convention —
+   * only radians→degrees conversion is needed. The listener rides the
+   * camera (getCenter returns the camera position), so its ears follow
+   * the camera's view direction.
    */
   getPitch(): number {
-    return 90 + this.toDegrees(this.viewer.camera.pitch);
+    return this.toDegrees(this.viewer.camera.pitch);
   }
 
   getRoll(): number {
@@ -128,14 +126,14 @@ export class CesiumAdapter implements MapAdapter {
 
   /**
    * Cesium fires `camera.changed` continuously during movement
-   * (once the camera has moved by more than `percentageChanged`).
-   * All four MapEvents are mapped to it so audio updates while the camera moves.
+   * (once the camera has moved by more than `percentageChanged`),
+   * covering pan, rotate, zoom and pitch with a single event.
    */
-  on(_event: MapEvent, handler: () => void): void {
+  onCameraChange(handler: () => void): void {
     this.viewer.camera.changed.addEventListener(handler);
   }
 
-  off(_event: MapEvent, handler: () => void): void {
+  offCameraChange(handler: () => void): void {
     this.viewer.camera.changed.removeEventListener(handler);
   }
 

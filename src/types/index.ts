@@ -140,6 +140,37 @@ export interface DopplerConfig {
   listenerMotion?: boolean;
 }
 
+// ---- Propagation delay ----
+
+export interface PropagationDelayConfig {
+  enabled: boolean;
+  /** Speed of sound in m/s. Default: 343.3 */
+  speedOfSound?: number;
+  /** How often (ms) the distance to each sound is sampled. Default: 100 */
+  updateInterval?: number;
+  /**
+   * Upper bound (seconds) on the simulated delay, and the fixed capacity of
+   * the underlying DelayNode. Distances beyond `maxDelayTime * speedOfSound`
+   * are clamped to this delay rather than growing further. Since a
+   * DelayNode's capacity is fixed at creation, changing this only affects
+   * sounds added after the change. Default: 5
+   */
+  maxDelayTime?: number;
+  /**
+   * Time constant (seconds) for AudioParam.setTargetAtTime smoothing, applied
+   * while the distance changes continuously (e.g. panning the map or a
+   * moving sound). Larger = smoother but laggier. Default: 0.1
+   */
+  smoothing?: number;
+  /**
+   * Distance change (meters) between consecutive samples beyond which the
+   * delay is snapped instantly instead of ramped. Catches discontinuities —
+   * a map flyTo/setView, or a sound teleported via updateSoundPosition —
+   * where ramping would otherwise sweep the delay audibly. Default: 500
+   */
+  jumpThreshold?: number;
+}
+
 // ---- Debug ----
 
 export interface DebugConfig {

@@ -4,9 +4,21 @@ import type { MapAdapter } from '../adapters/MapAdapter.js';
 export class CoordinateConverter {
   private mapAdapter: MapAdapter;
   private scale: Required<ScaleConfig> = { horizontal: 1.0, vertical: 1.0, global: 1.0 };
+  /** Supplies the listener's geographic position (the audio-space origin). */
+  private originProvider: () => Position;
 
   constructor(mapAdapter: MapAdapter) {
     this.mapAdapter = mapAdapter;
+    this.originProvider = () => this.mapAdapter.getCenter();
+  }
+
+  /**
+   * Overrides where the audio-space origin comes from. GeospatialAudio wires
+   * this to the ListenerManager so that manual listener positions
+   * (setListenerPosition) affect spatialization, not just culling.
+   */
+  setOriginProvider(provider: () => Position): void {
+    this.originProvider = provider;
   }
 
   /**
@@ -24,7 +36,7 @@ export class CoordinateConverter {
    */
   geoToAudio(geoPosition: Position): Vector3 {
     const R = 6_371_000; // Earth radius in metres
-    const listenerPos = this.mapAdapter.getCenter();
+    const listenerPos = this.originProvider();
     const latRad = (listenerPos.lat * Math.PI) / 180;
 
     const hScale = this.scale.horizontal * this.scale.global;

@@ -25,9 +25,10 @@ export type {
   ReverbConfig,
   ReverbPreset,
   DopplerConfig,
+  PropagationDelayConfig,
   DebugConfig,
   DebugInfo,
   SoundDebugInfo,
 } from './types/index.js';
 
-export type { MapAdapter, MapEvent } from './adapters/MapAdapter.js';
+export type { MapAdapter } from './adapters/MapAdapter.js';

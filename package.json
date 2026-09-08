@@ -1,6 +1,6 @@
 {
   "name": "geospatial-audio-js",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A JavaScript library for integrating 3D spatial audio with web map libraries",
   "type": "module",
   "main": "dist/geospatial-audio-js.umd.cjs",
@@ -17,7 +17,8 @@
     "dist/geospatial-audio-js.js",
     "dist/geospatial-audio-js.umd.cjs",
     "dist/index.d.ts",
-    "dist/src"
+    "dist/src",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "dev": "vite build --watch",
@@ -28,8 +29,6 @@
     "build:demo-cesium": "vite build --config demo-cesium/vite.config.ts",
     "dev:demo-intro": "vite --config demo-intro/vite.config.ts",
     "build:demo-intro": "vite build --config demo-intro/vite.config.ts",
-    "dev:demo-doppler": "vite --config demo-doppler-cesium/vite.config.ts",
-    "build:demo-doppler": "vite build --config demo-doppler-cesium/vite.config.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",

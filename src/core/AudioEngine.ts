@@ -16,6 +16,8 @@ export class AudioEngine {
   private audioContext: AudioContext;
   private masterGain: GainNode;
   private options: Required<GeospatialAudioOptions>;
+  /** Capacity (seconds) for DelayNodes created by createDelayNode(). Fixed per-node at creation. */
+  private propagationDelayMax = 5;
 
   // Reverb nodes (created on demand)
   private convolver: ConvolverNode | null = null;
@@ -60,6 +62,20 @@ export class AudioEngine {
     const gain = this.audioContext.createGain();
     gain.gain.value = initialGain;
     return gain;
+  }
+
+  /** Creates a DelayNode sized to the current propagation-delay capacity. */
+  createDelayNode(): DelayNode {
+    return new DelayNode(this.audioContext, { maxDelayTime: this.propagationDelayMax, delayTime: 0 });
+  }
+
+  /**
+   * Sets the capacity used by future createDelayNode() calls. A DelayNode's
+   * maxDelayTime is fixed at construction, so this only affects sounds added
+   * afterwards — existing sounds keep their original capacity.
+   */
+  setPropagationDelayMax(seconds: number): void {
+    this.propagationDelayMax = seconds;
   }
 
   async decodeAudioData(arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {

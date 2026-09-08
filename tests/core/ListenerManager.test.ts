@@ -19,8 +19,8 @@ function makeMockMapAdapter(overrides?: Partial<MapAdapter>): MapAdapter {
     getZoom: () => 15,
     project: ([lng, lat]) => ({ x: lng * 100, y: lat * 100 }),
     unproject: ({ x, y }) => [x / 100, y / 100],
-    on: () => {},
-    off: () => {},
+    onCameraChange: () => {},
+    offCameraChange: () => {},
     getMetersPerPixel: () => 4.77,
     getLibraryName: () => 'mock',
     ...overrides,
@@ -112,6 +112,22 @@ describe('ListenerManager', () => {
       expect(up.x).toBeCloseTo(0);
       expect(up.y).toBeCloseTo(1); // Up vector points up
       expect(up.z).toBeCloseTo(0);
+    });
+
+    it('bearing=0 pitch=-90 → forward = (0, -1, 0) (straight down)', () => {
+      const engine = makeMockAudioEngine();
+      const adapter = makeMockMapAdapter({ getBearing: () => 0, getPitch: () => -90 });
+      const emitter = new EventEmitter();
+      const manager = new ListenerManager(engine, adapter, emitter);
+
+      manager.updateFromMap();
+
+      const call = (engine.setListenerOrientation as ReturnType<typeof vi.fn>).mock.calls[0] as [{ x: number; y: number; z: number }, unknown];
+      const [forward] = call;
+      // Elevation angle convention: -90 = looking straight down (e.g. Cesium nadir view)
+      expect(forward.x).toBeCloseTo(0);
+      expect(forward.y).toBeCloseTo(-1);
+      expect(forward.z).toBeCloseTo(0);
     });
 
     it('bearing=90 pitch=0 → forward = (1, 0, 0) (East)', () => {

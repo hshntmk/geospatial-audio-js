@@ -55,14 +55,20 @@ describe('CesiumAdapter', () => {
     expect(adapter.getBearing()).toBeCloseTo(90, 1);
   });
 
-  it('getPitch() converts Cesium pitch convention (90 + deg)', () => {
-    // Cesium pitch = -45° → ourPitch = 90 + (-45) = 45
+  it('getPitch() passes the elevation angle through (radians → degrees)', () => {
+    // Cesium pitch = -45° (looking down at 45°) → -45
     const adapter = new CesiumAdapter(makeMockViewer() as never, makeMockCesium());
-    expect(adapter.getPitch()).toBeCloseTo(45, 1);
+    expect(adapter.getPitch()).toBeCloseTo(-45, 1);
   });
 
-  it('getPitch() returns 0 for horizontal view (Cesium pitch = -90°)', () => {
+  it('getPitch() returns -90 when looking straight down (Cesium pitch = -90°)', () => {
     const viewer = makeMockViewer({ camera: { ...makeMockViewer().camera, pitch: -90 * DEG } });
+    const adapter = new CesiumAdapter(viewer as never, makeMockCesium());
+    expect(adapter.getPitch()).toBeCloseTo(-90, 1);
+  });
+
+  it('getPitch() returns 0 for a horizontal view (Cesium pitch = 0)', () => {
+    const viewer = makeMockViewer({ camera: { ...makeMockViewer().camera, pitch: 0 } });
     const adapter = new CesiumAdapter(viewer as never, makeMockCesium());
     expect(adapter.getPitch()).toBeCloseTo(0, 1);
   });
@@ -74,19 +80,20 @@ describe('CesiumAdapter', () => {
     expect(result).toEqual({ x: 400, y: 300 });
   });
 
-  it('on() registers to camera.changed', () => {
+  it('onCameraChange() registers to camera.changed exactly once', () => {
     const viewer = makeMockViewer();
     const adapter = new CesiumAdapter(viewer as never, makeMockCesium());
     const handler = vi.fn();
-    adapter.on('move', handler);
+    adapter.onCameraChange(handler);
+    expect(viewer.camera.changed.addEventListener).toHaveBeenCalledTimes(1);
     expect(viewer.camera.changed.addEventListener).toHaveBeenCalledWith(handler);
   });
 
-  it('off() removes from camera.changed', () => {
+  it('offCameraChange() removes from camera.changed', () => {
     const viewer = makeMockViewer();
     const adapter = new CesiumAdapter(viewer as never, makeMockCesium());
     const handler = vi.fn();
-    adapter.off('rotate', handler);
+    adapter.offCameraChange(handler);
     expect(viewer.camera.changed.removeEventListener).toHaveBeenCalledWith(handler);
   });
 

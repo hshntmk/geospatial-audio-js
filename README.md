@@ -11,6 +11,7 @@ Places geographically-positioned sound sources in 3D space using the Web Audio A
 - **Web Audio API based** — High-quality 3D audio via HRTF
 - **Reverb** — Room, hall, and outdoor presets, or custom IR for environmental acoustics
 - **Doppler effect** — Pitch shift derived automatically from listener/source movement
+- **Propagation delay** — Distant sounds arrive later, delayed by distance / speed of sound
 - **Distance culling** — Automatically stops and resumes sound sources beyond a specified distance
 
 ## Installation
@@ -152,6 +153,21 @@ audio.setDopplerEffect({ enabled: true, dopplerFactor: 1.5 });
 audio.setDopplerEffect({ enabled: false });
 ```
 
+### Propagation Delay
+
+```ts
+// Enable — each sound is delayed by distance / speedOfSound, so it arrives
+// later the farther away it is. Follows moving sounds and map movement;
+// continuous motion ramps smoothly, map jumps (flyTo/setView) snap instantly.
+audio.setPropagationDelay({ enabled: true });
+
+// Custom speed of sound
+audio.setPropagationDelay({ enabled: true, speedOfSound: 340 });
+
+// Disable
+audio.setPropagationDelay({ enabled: false });
+```
+
 ### Master Volume
 
 ```ts
@@ -232,6 +248,7 @@ Both are available at `http://localhost:5173/`.
 |---|---|
 | [docs/api.md](docs/api.md) | **API Reference** (all methods and type definitions) |
 | [docs/demo.md](docs/demo.md) | Demo setup and walkthrough |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes (including breaking changes) |
 
 ## Browser Support
 

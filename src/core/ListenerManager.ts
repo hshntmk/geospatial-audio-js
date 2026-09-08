@@ -16,13 +16,16 @@ export class ListenerManager {
   private eventEmitter: EventEmitter;
 
   private autoSync = true;
-  private currentPosition: Position = { lng: 0, lat: 0, alt: 0 };
+  private currentPosition: Position;
   private currentOrientation: Orientation = { bearing: 0, pitch: 0, roll: 0 };
 
   constructor(audioEngine: AudioEngine, mapAdapter: MapAdapter, eventEmitter: EventEmitter) {
     this.audioEngine = audioEngine;
     this.mapAdapter = mapAdapter;
     this.eventEmitter = eventEmitter;
+    // Start at the map center so sounds added before the first map event /
+    // initialize() are positioned relative to a real location, not (0, 0).
+    this.currentPosition = mapAdapter.getCenter();
   }
 
   /** Called every time the map moves/rotates/pitches. */
@@ -78,13 +81,13 @@ export class ListenerManager {
   }
 
   /**
-   * Converts bearing + pitch (MapLibre convention) into Web Audio forward / up vectors.
+   * Converts bearing + pitch into Web Audio forward / up vectors.
    *
    * Coordinate convention (Web Audio):
    *   X → East, Y → Up, Z → South (North = -Z)
    *
    * bearing: 0 = North, clockwise
-   * pitch:   0 = horizontal, positive = looking up
+   * pitch:   elevation angle — 0 = horizontal, positive = up, negative = down
    */
   private calculateOrientation(
     bearing: number,

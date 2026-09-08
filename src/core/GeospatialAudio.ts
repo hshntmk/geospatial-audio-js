@@ -8,6 +8,7 @@ import type {
   LogLevel,
   ReverbConfig,
   DopplerConfig,
+  PropagationDelayConfig,
   DebugConfig,
   DebugInfo,
 } from '../types/index.js';
@@ -16,6 +17,7 @@ import { SoundManager } from './SoundManager.js';
 import { ListenerManager } from './ListenerManager.js';
 import { PerformanceOptimizer } from './PerformanceOptimizer.js';
 import { DopplerController } from './DopplerController.js';
+import { PropagationDelayController } from './PropagationDelayController.js';
 import { DebugHelper } from './DebugHelper.js';
 import type { MapAdapter } from '../adapters/MapAdapter.js';
 import { CoordinateConverter } from '../utils/CoordinateConverter.js';
@@ -46,6 +48,7 @@ export class GeospatialAudio {
   private listenerManager: ListenerManager;
   private performanceOptimizer: PerformanceOptimizer;
   private dopplerController: DopplerController;
+  private propagationDelayController: PropagationDelayController;
   private debugHelper: DebugHelper;
 
   /** Bound handler kept so we can remove it in dispose(). */
@@ -67,6 +70,12 @@ export class GeospatialAudio {
       this.mapAdapter,
       this.eventEmitter,
     );
+    // Spatialization shares the listener position tracked by ListenerManager,
+    // so manual setListenerPosition() affects panning/volume — not just
+    // culling and Doppler. With auto-sync on this is the map center as before.
+    this.coordinateConverter.setOriginProvider(
+      () => this.listenerManager.getCurrentPosition(),
+    );
     this.performanceOptimizer = new PerformanceOptimizer(
       this.soundManager,
       this.listenerManager,
@@ -78,12 +87,21 @@ export class GeospatialAudio {
       this.listenerManager,
       this.coordinateConverter,
     );
+    this.propagationDelayController = new PropagationDelayController(
+      this.soundManager,
+      this.listenerManager,
+      this.coordinateConverter,
+    );
     this.debugHelper = new DebugHelper(
       this.soundManager,
       this.listenerManager,
       this.audioEngine,
       this.coordinateConverter,
     );
+    // Wire back so position updates and optimizer ticks reach the debug hooks
+    // (no-ops until enableDebug() turns the corresponding flag on).
+    this.soundManager.setDebugHelper(this.debugHelper);
+    this.performanceOptimizer.setDebugHelper(this.debugHelper);
 
     this.onMapChange = () => {
       this.listenerManager.updateFromMap();
@@ -113,11 +131,10 @@ export class GeospatialAudio {
   }
 
   dispose(): void {
-    (['move', 'rotate', 'zoom', 'pitch'] as const).forEach(ev => {
-      this.mapAdapter.off(ev, this.onMapChange);
-    });
+    this.mapAdapter.offCameraChange(this.onMapChange);
     this.performanceOptimizer.dispose();
     this.dopplerController.dispose();
+    this.propagationDelayController.dispose();
     this.soundManager.dispose();
     this.audioEngine.dispose();
     this.eventEmitter.emit('disposed');
@@ -167,10 +184,15 @@ export class GeospatialAudio {
 
   syncWithMap(enabled: boolean): void {
     this.listenerManager.enableAutoSync(enabled);
+    if (enabled) {
+      // Re-sync immediately instead of waiting for the next map event.
+      this.onMapChange();
+    }
   }
 
   setListenerPosition(position: [number, number, number?]): void {
     this.listenerManager.setPosition(position);
+    this.soundManager.updateAllPositions();
   }
 
   setListenerOrientation(bearing: number, pitch: number, roll?: number): void {
@@ -231,6 +253,24 @@ export class GeospatialAudio {
     this.dopplerController.setConfig(config);
   }
 
+  // ── Propagation delay ────────────────────────────────────────────────────
+
+  /**
+   * Enables or updates the sound-propagation delay: each sound is delayed by
+   * distance / speedOfSound, so distant sounds arrive noticeably later, like
+   * real sound travel. The delay is derived automatically from distance and
+   * follows both moving sounds and listener/map movement — continuous motion
+   * ramps smoothly, while a jump (map flyTo/setView, a teleported sound)
+   * snaps instantly to avoid an audible sweep. Pass `{ enabled: false }` to
+   * disable and restore zero delay.
+   */
+  setPropagationDelay(config: PropagationDelayConfig): void {
+    if (config.maxDelayTime !== undefined) {
+      this.audioEngine.setPropagationDelayMax(config.maxDelayTime);
+    }
+    this.propagationDelayController.setConfig(config);
+  }
+
   // ── Debug ────────────────────────────────────────────────────────────────
 
   enableDebug(config: DebugConfig): void {
@@ -252,8 +292,6 @@ export class GeospatialAudio {
   // ── Private ──────────────────────────────────────────────────────────────
 
   private setupMapListeners(): void {
-    (['move', 'rotate', 'zoom', 'pitch'] as const).forEach(ev => {
-      this.mapAdapter.on(ev, this.onMapChange);
-    });
+    this.mapAdapter.onCameraChange(this.onMapChange);
   }
 }

@@ -9,6 +9,7 @@ Web地図ライブラリに3D音響機能を追加する汎用JavaScriptライ�
 - **Web Audio API ベース** — HRTF による高品質な3D音響
 - **リバーブ** — 部屋・ホール・屋外プリセット、またはカスタム IR による環境音響
 - **ドップラー効果** — リスナー／音源の移動から自動算出されるピッチシフト
+- **音の伝搬遅延** — 距離 ÷ 音速に応じて、遠い音ほど遅れて届く
 - **距離カリング** — 指定距離以上の音源を自動停止・再開
 
 ## インストール
@@ -150,6 +151,21 @@ audio.setDopplerEffect({ enabled: true, dopplerFactor: 1.5 });
 audio.setDopplerEffect({ enabled: false });
 ```
 
+### 音の伝搬遅延
+
+```ts
+// 有効化 — 各音源は distance / speedOfSound 秒だけ遅延して届くようになり、
+// 遠い音ほど遅れて聞こえます。音源の移動・地図移動の両方に追従し、
+// 連続した動きはなめらかに、地図のジャンプ（flyTo/setView）は瞬時に反映されます。
+audio.setPropagationDelay({ enabled: true });
+
+// 音速を指定
+audio.setPropagationDelay({ enabled: true, speedOfSound: 340 });
+
+// 無効化
+audio.setPropagationDelay({ enabled: false });
+```
+
 ### マスターボリューム
 
 ```ts
@@ -230,6 +246,7 @@ npm run dev:demo-cesium
 |---|---|
 | [docs/api.md](docs/api.md) | **APIリファレンス**（全メソッド・型定義） |
 | [docs/demo.md](docs/demo.md) | デモの起動・解説 |
+| [CHANGELOG.md](CHANGELOG.md) | リリースノート（破壊的変更を含む） |
 
 ## 対応ブラウザ
 
@@ -247,3 +264,7 @@ Web Audio API (`PannerNode`) に対応した以下のブラウザ:
 | Leaflet | ✅ 対応済み |
 | Cesium | ✅ 対応済み |
 | Google Maps | 🔜 Phase 3 予定 |
+
+## ライセンス
+
+[MIT](LICENSE)

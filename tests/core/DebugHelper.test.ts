@@ -95,11 +95,22 @@ describe('DebugHelper', () => {
   });
 
   describe('enable() / disable()', () => {
-    it('enable() sets logAudioParams config', () => {
+    it('enable() makes logSoundParams log to console', () => {
       const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
       helper.enable({ logAudioParams: true });
-      // logSoundParams should now log (we verify no throw)
-      expect(() => helper.logSoundParams('test-sound')).not.toThrow();
+      consoleSpy.mockClear(); // ignore the "enabled" notice
+      helper.logSoundParams('test-sound');
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
+      consoleSpy.mockRestore();
+    });
+
+    it('enable() makes markUpdateStart/End log timings to console', () => {
+      const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      helper.enable({ logPerformance: true });
+      consoleSpy.mockClear();
+      helper.markUpdateStart();
+      helper.markUpdateEnd();
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
       consoleSpy.mockRestore();
     });
 

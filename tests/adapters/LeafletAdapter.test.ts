@@ -52,19 +52,22 @@ describe('LeafletAdapter', () => {
     expect(lat).toBeCloseTo(0.5);
   });
 
-  it('on("move") registers the leaflet move event', () => {
+  it('onCameraChange() registers the leaflet move and zoom events', () => {
     const map = makeMockLeafletMap();
     const adapter = new LeafletAdapter(map);
     const handler = vi.fn();
-    adapter.on('move', handler);
+    adapter.onCameraChange(handler);
     expect(map.on).toHaveBeenCalledWith('move', handler);
+    expect(map.on).toHaveBeenCalledWith('zoom', handler);
   });
 
-  it('on("rotate") is a no-op (Leaflet has no rotation)', () => {
+  it('offCameraChange() removes the leaflet move and zoom events', () => {
     const map = makeMockLeafletMap();
     const adapter = new LeafletAdapter(map);
-    adapter.on('rotate', vi.fn());
-    expect(map.on).not.toHaveBeenCalled();
+    const handler = vi.fn();
+    adapter.offCameraChange(handler);
+    expect(map.off).toHaveBeenCalledWith('move', handler);
+    expect(map.off).toHaveBeenCalledWith('zoom', handler);
   });
 
   it('getLibraryName() returns "leaflet"', () => {
