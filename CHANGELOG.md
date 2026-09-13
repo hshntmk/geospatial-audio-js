@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] - 2026-06-12
+## [0.3.0] - 2026-09-13
 
 ### ⚠ Breaking Changes
 
@@ -82,14 +82,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Propagation delay** (`setPropagationDelay()`): each sound is delayed by
+  `distance / speedOfSound`, so distant sounds arrive noticeably later, the
+  way real sound travel works. The delay is derived automatically from
+  distance and follows both moving sounds and listener/map movement —
+  continuous motion (panning, a moving sound) ramps smoothly, while a jump
+  (`flyTo`/`setView`, a sound teleported via `updateSoundPosition`) snaps
+  instantly to avoid an audible sweep across the discontinuity. Independent
+  of `setDopplerEffect()` — both can be enabled together.
 - `LICENSE` file (MIT). The license was previously only declared in
   `package.json`.
 - License sections in `README.md` / `README.ja.md`.
-
-### Removed
-
-- `dev:demo-doppler` / `build:demo-doppler` npm scripts, which referenced a
-  demo directory that is not part of the published repository.
 
 ## [0.2.0]
 
