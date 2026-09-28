@@ -91,15 +91,33 @@ describe('PropagationDelayController', () => {
     expect(s.getPropagationDelay()).toBeCloseTo(5000 / C, 5);
   });
 
-  it('resets a sound to zero delay when it stops playing', () => {
+  it('leaves a sound\'s delay untouched when it stops playing (does not truncate the draining tail)', () => {
     const s = makeSound('a', 1000);
     sounds.push(s);
     update();
-    expect(s.getPropagationDelay()).toBeGreaterThan(0);
+    const delayWhilePlaying = s.getPropagationDelay();
+    expect(delayWhilePlaying).toBeGreaterThan(0);
 
     (s as unknown as { state: SoundState }).state = 'paused';
     update();
-    expect(s.getPropagationDelay()).toBe(0);
+    // Must NOT be forced to 0 — that would yank the DelayNode's read position
+    // forward and truncate/garble audio still draining out of it.
+    expect(s.getPropagationDelay()).toBe(delayWhilePlaying);
+  });
+
+  it('snaps fresh (not stale) when a sound starts playing again after stopping', () => {
+    const s = makeSound('a', 1000);
+    sounds.push(s);
+    update();
+    (s as unknown as { state: SoundState }).state = 'paused';
+    update(); // forgets the distance sample, delay left as-is
+
+    (s as unknown as { state: SoundState }).state = 'playing';
+    s.geoPosition.lng = 1500; // moved while paused, still under the default 5s maxDelayTime cap
+    update();
+    // No prev sample after replay → snaps directly to the new distance,
+    // rather than ramping from the old (now stale) value.
+    expect(s.getPropagationDelay()).toBeCloseTo(1500 / C, 5);
   });
 
   it('restores all delays to zero when disabled', () => {

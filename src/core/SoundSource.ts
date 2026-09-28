@@ -4,7 +4,8 @@ import { EventEmitter } from '../utils/EventEmitter.js';
 
 /**
  * Represents a single positioned audio source.
- * Manages its own Web Audio graph: BufferSource → PannerNode → GainNode → masterGain.
+ * Manages its own Web Audio graph:
+ * BufferSource → DelayNode → BiquadFilterNode → PannerNode → GainNode → masterGain.
  */
 export class SoundSource extends EventEmitter {
   readonly id: string;
@@ -15,6 +16,7 @@ export class SoundSource extends EventEmitter {
 
   private source: AudioBufferSourceNode | null = null;
   private delayNode: DelayNode;
+  private filterNode: BiquadFilterNode;
   private panner: PannerNode;
   private gainNode: GainNode;
 
@@ -41,8 +43,10 @@ export class SoundSource extends EventEmitter {
 
     this.panner = audioEngine.createPannerNode(config.pannerOptions);
     this.delayNode = audioEngine.createDelayNode();
+    this.filterNode = audioEngine.createFilterNode();
     this.gainNode = audioEngine.createGainNode(config.volume ?? 1.0);
-    this.delayNode.connect(this.panner);
+    this.delayNode.connect(this.filterNode);
+    this.filterNode.connect(this.panner);
     this.panner.connect(this.gainNode);
     this.gainNode.connect(audioEngine.getMasterGain());
   }
@@ -168,6 +172,30 @@ export class SoundSource extends EventEmitter {
     return this.delayNode.delayTime.value;
   }
 
+  /**
+   * Sets the air-absorption lowpass cutoff (Hz) — lower means more muffled.
+   * With `smoothing > 0` the change is ramped via setTargetAtTime for
+   * continuous motion; with `smoothing = 0` (default) it is applied
+   * instantly — used to snap across discontinuities (map jumps, teleported
+   * sounds) instead of sweeping the filter audibly.
+   */
+  setAirAbsorptionCutoff(frequencyHz: number, smoothing = 0): void {
+    const param = this.filterNode.frequency;
+    const clamped = Math.max(param.minValue, Math.min(frequencyHz, param.maxValue));
+    const ctx = this.audioEngine.getContext();
+    const setTarget = (param as AudioParam).setTargetAtTime;
+    if (smoothing > 0 && typeof setTarget === 'function') {
+      param.setTargetAtTime(clamped, ctx.currentTime, smoothing);
+    } else {
+      param.cancelScheduledValues(ctx.currentTime);
+      param.value = clamped;
+    }
+  }
+
+  getAirAbsorptionCutoff(): number {
+    return this.filterNode.frequency.value;
+  }
+
   getVolume(): number {
     return this.gainNode.gain.value;
   }
@@ -191,6 +219,7 @@ export class SoundSource extends EventEmitter {
   dispose(): void {
     this.stop();
     this.delayNode.disconnect();
+    this.filterNode.disconnect();
     this.panner.disconnect();
     this.gainNode.disconnect();
     this.removeAllListeners();

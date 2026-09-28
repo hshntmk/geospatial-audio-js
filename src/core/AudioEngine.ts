@@ -78,6 +78,15 @@ export class AudioEngine {
     this.propagationDelayMax = seconds;
   }
 
+  /** Creates a lowpass BiquadFilterNode, wide open (20 kHz) until a controller narrows it. */
+  createFilterNode(): BiquadFilterNode {
+    const filter = this.audioContext.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 20_000;
+    filter.Q.value = 0.707;
+    return filter;
+  }
+
   async decodeAudioData(arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
     return this.audioContext.decodeAudioData(arrayBuffer);
   }

@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-09-14
+
+### Added
+
+- **Air absorption** (`setAirAbsorption()`): distant sounds lose high
+  frequencies, not just volume — the way real sound is muffled by air over
+  distance. Modeled as a lowpass filter whose cutoff decays exponentially
+  with distance, derived automatically the same way propagation delay and
+  the Doppler effect are: continuous motion ramps the cutoff smoothly, while
+  a jump (`flyTo`/`setView`, a sound teleported via `updateSoundPosition`)
+  snaps instantly. Independent of `setDopplerEffect()` and
+  `setPropagationDelay()` — all three can be enabled together.
+
+### Fixed
+
+- **Propagation delay no longer truncates a sound's tail.** `setPropagationDelay()`
+  was forcing a sound's `DelayNode` delay to 0 the instant its own (undelayed)
+  playback finished — which yanked the delay line's read position forward and
+  discarded whatever audio was still queued waiting to be heard. Depending on
+  the delay amount, this could produce a brief garbled blip near the sound's
+  original (non-delayed) timing followed by silence, instead of the sound
+  playing out correctly at its delayed time. This affected any non-looping
+  sound with propagation delay enabled, regardless of distance. The same
+  premature-reset pattern in `setAirAbsorption()`'s controller has also been
+  fixed — a sound's filter cutoff no longer snaps back to "unfiltered" while
+  delayed audio is still draining through it.
+
 ## [0.3.0] - 2026-09-13
 
 ### ⚠ Breaking Changes

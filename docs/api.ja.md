@@ -375,6 +375,55 @@ interface PropagationDelayConfig {
 
 ---
 
+## 空気による音の減衰
+
+### `setAirAbsorption(config: AirAbsorptionConfig): void`
+
+空気による音の減衰（エアアブソープション）を設定します。遠い音ほど音量だけでなく**高音域が失われ**、実際に空気中を伝わる音がこもって聞こえるのと同じ効果を再現します。カットオフ周波数は`setDopplerEffect`・`setPropagationDelay`と同様に距離から**自動的に算出**され、音源の移動・リスナー／地図の移動の両方に追従します。`{ enabled: false }` を渡すと無効化され、フィルタが全開(無フィルタ)の状態に戻ります。
+
+```ts
+// デフォルト値で有効化
+audio.setAirAbsorption({ enabled: true });
+
+// より短い距離でこもらせ、遠くでもこもりすぎないよう下限を上げる
+audio.setAirAbsorption({ enabled: true, falloffDistance: 200, minCutoffFrequency: 2000 });
+
+// 無効化
+audio.setAirAbsorption({ enabled: false });
+```
+
+#### AirAbsorptionConfig
+
+```ts
+interface AirAbsorptionConfig {
+  enabled:              boolean;
+  maxCutoffFrequency?:  number;  // 距離0でのカットオフ(Hz) — 無フィルタ、デフォルト: 20000
+  minCutoffFrequency?:  number;  // 遠距離で近づくカットオフ(Hz) — 最も篭った状態、デフォルト: 1000
+  falloffDistance?:     number;  // 指数減衰の特性距離(m)、デフォルト: 500
+  updateInterval?:      number;  // 距離のサンプリング間隔(ms)、デフォルト: 100
+  Q?:                   number;  // BiquadFilterNode(lowpass)のQ値、デフォルト: 0.707（共振なし）
+  smoothing?:           number;  // setTargetAtTime の時定数(秒)、デフォルト: 0.1
+  jumpThreshold?:       number;  // スナップ（瞬時反映）を発動する距離の変化量(m)、デフォルト: 500
+}
+```
+
+**仕組み:** 各音源のオーディオはlowpassの`BiquadFilterNode`を通過し、そのカットオフ周波数は次式で決まります。
+
+```
+cutoff = minCutoffFrequency + (maxCutoffFrequency − minCutoffFrequency) × e^(−distance / falloffDistance)
+```
+
+距離0では`maxCutoffFrequency`(無フィルタ)から始まり、距離が伸びるほど`minCutoffFrequency`(最も篭った状態)に向かって減衰します(`falloffDistance`1つ分でおよそ63%、3つ分でおよそ95%まで到達)。音の伝搬遅延と同様、更新のたびに直前のサンプルとの距離変化を比較します。
+
+| 距離の変化量 | 挙動 |
+|---|---|
+| `jumpThreshold` 以下 | 連続的な移動（地図のパン、音源の移動）— `AudioParam.setTargetAtTime` により**なめらかにランプ**します。 |
+| `jumpThreshold` を超える | 不連続な変化（`flyTo`／`setView`、`updateSoundPosition` による音源のテレポート）— カットオフを**瞬時にスナップ**し、ジャンプをまたいで不自然にフィルタが変化するのを防ぎます。 |
+
+> **注意:** これは空気吸収を単一のlowpassフィルタと指数減衰カーブで近似した知覚モデルであり、多くのゲームオーディオエンジンが採用している方式です。周波数帯域ごとの減衰係数を積み上げるISO 9613-1のような物理的に厳密なモデルではありません。`setDopplerEffect`・`setPropagationDelay`とは独立しており、3つとも同時に有効化できます。それぞれピッチ・到達時刻・音色という異なる側面から実際の音の伝搬を再現します。
+
+---
+
 ## マスターボリューム
 
 ### `setMasterVolume(volume: number): void`
@@ -629,6 +678,7 @@ export type {
   ReverbConfig, ReverbPreset,
   DopplerConfig,
   PropagationDelayConfig,
+  AirAbsorptionConfig,
   DebugConfig, DebugInfo, SoundDebugInfo,
   MapAdapter,
 } from 'geospatial-audio-js';

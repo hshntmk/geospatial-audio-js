@@ -12,6 +12,7 @@ Places geographically-positioned sound sources in 3D space using the Web Audio A
 - **Reverb** — Room, hall, and outdoor presets, or custom IR for environmental acoustics
 - **Doppler effect** — Pitch shift derived automatically from listener/source movement
 - **Propagation delay** — Distant sounds arrive later, delayed by distance / speed of sound
+- **Air absorption** — Distant sounds lose high frequencies (not just volume), like real sound muffled by air
 - **Distance culling** — Automatically stops and resumes sound sources beyond a specified distance
 
 ## Installation
@@ -166,6 +167,20 @@ audio.setPropagationDelay({ enabled: true, speedOfSound: 340 });
 
 // Disable
 audio.setPropagationDelay({ enabled: false });
+```
+
+### Air Absorption
+
+```ts
+// Enable — distant sounds lose high frequencies (a lowpass filter whose
+// cutoff decays with distance), so they sound muffled, not just quieter.
+audio.setAirAbsorption({ enabled: true });
+
+// Muffle over a shorter range
+audio.setAirAbsorption({ enabled: true, falloffDistance: 200 });
+
+// Disable
+audio.setAirAbsorption({ enabled: false });
 ```
 
 ### Master Volume

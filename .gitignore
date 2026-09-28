@@ -12,5 +12,8 @@ dist/
 docs/requirements.md
 docs/architecture.md
 
+# Scratch file for `gh release create --notes-file` (see docs/release-notes-template.md)
+/RELEASE_NOTES.md
+
 # Misc
 PannerNodeTest-main/

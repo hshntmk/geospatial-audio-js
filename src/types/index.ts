@@ -171,6 +171,49 @@ export interface PropagationDelayConfig {
   jumpThreshold?: number;
 }
 
+// ---- Air absorption ----
+
+export interface AirAbsorptionConfig {
+  enabled: boolean;
+  /**
+   * Lowpass cutoff (Hz) at distance 0 — effectively unfiltered. Default: 20000
+   */
+  maxCutoffFrequency?: number;
+  /**
+   * Lowpass cutoff (Hz) the filter approaches as distance grows, i.e. the
+   * most muffled the sound can get. Default: 1000
+   */
+  minCutoffFrequency?: number;
+  /**
+   * Distance (meters) controlling how quickly the cutoff falls from
+   * `maxCutoffFrequency` toward `minCutoffFrequency`: the cutoff decays
+   * exponentially with a characteristic length of one `falloffDistance`
+   * (~63% of the way to the minimum at that distance, ~95% by 3×). Smaller =
+   * sounds muffle over a shorter range. Default: 500
+   */
+  falloffDistance?: number;
+  /** How often (ms) the distance to each sound is sampled. Default: 100 */
+  updateInterval?: number;
+  /**
+   * Q (resonance) of the underlying BiquadFilterNode lowpass. Default: 0.707
+   * (Butterworth response, no resonant peak).
+   */
+  Q?: number;
+  /**
+   * Time constant (seconds) for AudioParam.setTargetAtTime smoothing, applied
+   * while the distance changes continuously (e.g. panning the map or a
+   * moving sound). Larger = smoother but laggier. Default: 0.1
+   */
+  smoothing?: number;
+  /**
+   * Distance change (meters) between consecutive samples beyond which the
+   * cutoff is snapped instantly instead of ramped. Catches discontinuities —
+   * a map flyTo/setView, or a sound teleported via updateSoundPosition —
+   * where ramping would otherwise sweep the filter audibly. Default: 500
+   */
+  jumpThreshold?: number;
+}
+
 // ---- Debug ----
 
 export interface DebugConfig {

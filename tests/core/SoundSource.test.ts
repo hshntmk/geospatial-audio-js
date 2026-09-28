@@ -38,6 +38,16 @@ function makeDelayNode(): DelayNode {
   } as unknown as DelayNode;
 }
 
+function makeFilterNode(): BiquadFilterNode {
+  return {
+    frequency: { value: 20_000, minValue: 0, maxValue: 22_050, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
+    Q: { value: 0.707 },
+    type: 'lowpass',
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  } as unknown as BiquadFilterNode;
+}
+
 describe('SoundSource', () => {
   describe('pause/resume offset', () => {
     it('resumes a non-looping sound at pauseOffset', () => {
@@ -50,6 +60,7 @@ describe('SoundSource', () => {
         getContext: () => ({ currentTime: time, createBufferSource: () => source }),
         createPannerNode: () => panner,
         createDelayNode: () => makeDelayNode(),
+        createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
       } as unknown as AudioEngine;
@@ -83,6 +94,7 @@ describe('SoundSource', () => {
         getContext: () => ({ currentTime: time, createBufferSource: makeNodeFn }),
         createPannerNode: () => panner,
         createDelayNode: () => makeDelayNode(),
+        createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
       } as unknown as AudioEngine;
@@ -106,6 +118,7 @@ describe('SoundSource', () => {
         getContext: () => ({ currentTime: time, createBufferSource: () => makeSource(started) }),
         createPannerNode: () => panner,
         createDelayNode: () => makeDelayNode(),
+        createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
       } as unknown as AudioEngine;
@@ -137,6 +150,7 @@ describe('SoundSource', () => {
         getContext: () => ({ currentTime: 0, createBufferSource: () => node }),
         createPannerNode: () => panner,
         createDelayNode: () => makeDelayNode(),
+        createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
       } as unknown as AudioEngine;
@@ -156,6 +170,7 @@ describe('SoundSource', () => {
         getContext: () => ({ currentTime: 0, createBufferSource: () => node }),
         createPannerNode: () => panner,
         createDelayNode: () => makeDelayNode(),
+        createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
       } as unknown as AudioEngine;
@@ -181,6 +196,7 @@ describe('SoundSource', () => {
         getContext: () => ({ currentTime, createBufferSource: () => makeSource({ offset: 0 }) }),
         createPannerNode: () => panner,
         createDelayNode: () => delayNode,
+        createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
       } as unknown as AudioEngine;
@@ -220,6 +236,7 @@ describe('SoundSource', () => {
 
     it('routes the buffer source through the delay node', () => {
       const delayNode = makeDelayNode();
+      const filterNode = makeFilterNode();
       const source = makeSource({ offset: 0 });
       const panner = { positionX: { value: 0 }, positionY: { value: 0 }, positionZ: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() } as unknown as PannerNode;
       const gain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() } as unknown as GainNode;
@@ -227,6 +244,7 @@ describe('SoundSource', () => {
         getContext: () => ({ currentTime: 0, createBufferSource: () => source }),
         createPannerNode: () => panner,
         createDelayNode: () => delayNode,
+        createFilterNode: () => filterNode,
         createGainNode: () => gain,
         getMasterGain: () => gain,
       } as unknown as AudioEngine;
@@ -235,7 +253,75 @@ describe('SoundSource', () => {
       sound.play();
 
       expect(source.connect).toHaveBeenCalledWith(delayNode);
-      expect(delayNode.connect).toHaveBeenCalledWith(panner);
+      expect(delayNode.connect).toHaveBeenCalledWith(filterNode);
+      expect(filterNode.connect).toHaveBeenCalledWith(panner);
+    });
+  });
+
+  describe('air absorption', () => {
+    function makeEngine(currentTime: number, filterNode: BiquadFilterNode): AudioEngine {
+      const panner = { positionX: { value: 0 }, positionY: { value: 0 }, positionZ: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() } as unknown as PannerNode;
+      const gain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() } as unknown as GainNode;
+      return {
+        getContext: () => ({ currentTime, createBufferSource: () => makeSource({ offset: 0 }) }),
+        createPannerNode: () => panner,
+        createDelayNode: () => makeDelayNode(),
+        createFilterNode: () => filterNode,
+        createGainNode: () => gain,
+        getMasterGain: () => gain,
+      } as unknown as AudioEngine;
+    }
+
+    it('sets frequency directly when smoothing is 0 (snap)', () => {
+      const filterNode = makeFilterNode();
+      const sound = new SoundSource('s', makeAudioBuffer(5), makeEngine(0, filterNode), makeConfig());
+
+      sound.setAirAbsorptionCutoff(1500);
+
+      expect(filterNode.frequency.value).toBe(1500);
+      expect(filterNode.frequency.cancelScheduledValues).toHaveBeenCalled();
+      expect(filterNode.frequency.setTargetAtTime).not.toHaveBeenCalled();
+      expect(sound.getAirAbsorptionCutoff()).toBe(1500);
+    });
+
+    it('ramps via setTargetAtTime when smoothing > 0', () => {
+      const filterNode = makeFilterNode();
+      const sound = new SoundSource('s', makeAudioBuffer(5), makeEngine(3, filterNode), makeConfig());
+
+      sound.setAirAbsorptionCutoff(2000, 0.1);
+
+      expect(filterNode.frequency.setTargetAtTime).toHaveBeenCalledWith(2000, 3, 0.1);
+    });
+
+    it('clamps to the node range (minValue/maxValue)', () => {
+      const filterNode = makeFilterNode(); // minValue: 0, maxValue: 22050
+      const sound = new SoundSource('s', makeAudioBuffer(5), makeEngine(0, filterNode), makeConfig());
+
+      sound.setAirAbsorptionCutoff(100_000);
+      expect(sound.getAirAbsorptionCutoff()).toBe(22_050);
+
+      sound.setAirAbsorptionCutoff(-1);
+      expect(sound.getAirAbsorptionCutoff()).toBe(0);
+    });
+
+    it('routes the delay node through the filter node into the panner', () => {
+      const delayNode = makeDelayNode();
+      const filterNode = makeFilterNode();
+      const panner = { positionX: { value: 0 }, positionY: { value: 0 }, positionZ: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() } as unknown as PannerNode;
+      const gain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() } as unknown as GainNode;
+      const engine = {
+        getContext: () => ({ currentTime: 0, createBufferSource: () => makeSource({ offset: 0 }) }),
+        createPannerNode: () => panner,
+        createDelayNode: () => delayNode,
+        createFilterNode: () => filterNode,
+        createGainNode: () => gain,
+        getMasterGain: () => gain,
+      } as unknown as AudioEngine;
+
+      new SoundSource('s', makeAudioBuffer(5), engine, makeConfig());
+
+      expect(delayNode.connect).toHaveBeenCalledWith(filterNode);
+      expect(filterNode.connect).toHaveBeenCalledWith(panner);
     });
   });
 });

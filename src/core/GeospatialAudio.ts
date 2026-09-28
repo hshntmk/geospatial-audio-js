@@ -9,6 +9,7 @@ import type {
   ReverbConfig,
   DopplerConfig,
   PropagationDelayConfig,
+  AirAbsorptionConfig,
   DebugConfig,
   DebugInfo,
 } from '../types/index.js';
@@ -18,6 +19,7 @@ import { ListenerManager } from './ListenerManager.js';
 import { PerformanceOptimizer } from './PerformanceOptimizer.js';
 import { DopplerController } from './DopplerController.js';
 import { PropagationDelayController } from './PropagationDelayController.js';
+import { AirAbsorptionController } from './AirAbsorptionController.js';
 import { DebugHelper } from './DebugHelper.js';
 import type { MapAdapter } from '../adapters/MapAdapter.js';
 import { CoordinateConverter } from '../utils/CoordinateConverter.js';
@@ -49,6 +51,7 @@ export class GeospatialAudio {
   private performanceOptimizer: PerformanceOptimizer;
   private dopplerController: DopplerController;
   private propagationDelayController: PropagationDelayController;
+  private airAbsorptionController: AirAbsorptionController;
   private debugHelper: DebugHelper;
 
   /** Bound handler kept so we can remove it in dispose(). */
@@ -88,6 +91,11 @@ export class GeospatialAudio {
       this.coordinateConverter,
     );
     this.propagationDelayController = new PropagationDelayController(
+      this.soundManager,
+      this.listenerManager,
+      this.coordinateConverter,
+    );
+    this.airAbsorptionController = new AirAbsorptionController(
       this.soundManager,
       this.listenerManager,
       this.coordinateConverter,
@@ -135,6 +143,7 @@ export class GeospatialAudio {
     this.performanceOptimizer.dispose();
     this.dopplerController.dispose();
     this.propagationDelayController.dispose();
+    this.airAbsorptionController.dispose();
     this.soundManager.dispose();
     this.audioEngine.dispose();
     this.eventEmitter.emit('disposed');
@@ -269,6 +278,22 @@ export class GeospatialAudio {
       this.audioEngine.setPropagationDelayMax(config.maxDelayTime);
     }
     this.propagationDelayController.setConfig(config);
+  }
+
+  // ── Air absorption ───────────────────────────────────────────────────────
+
+  /**
+   * Enables or updates air absorption: distant sounds lose high frequencies
+   * (not just volume), the way real sound is muffled by air over distance.
+   * Modeled as a lowpass filter whose cutoff decays exponentially with
+   * distance, derived automatically the same way propagation delay and the
+   * Doppler effect are — continuous motion ramps the cutoff smoothly, while a
+   * jump (map flyTo/setView, a teleported sound) snaps instantly to avoid an
+   * audible filter sweep. Pass `{ enabled: false }` to disable and restore
+   * the unfiltered (fully open) cutoff.
+   */
+  setAirAbsorption(config: AirAbsorptionConfig): void {
+    this.airAbsorptionController.setConfig(config);
   }
 
   // ── Debug ────────────────────────────────────────────────────────────────

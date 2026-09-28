@@ -374,6 +374,55 @@ interface PropagationDelayConfig {
 
 ---
 
+## Air Absorption
+
+### `setAirAbsorption(config: AirAbsorptionConfig): void`
+
+Enables or updates air absorption: distant sounds lose high frequencies — not just volume — the way real sound is muffled by air over distance. The cutoff is derived **automatically** from distance and follows both moving sounds and listener/map movement, the same way `setDopplerEffect` and `setPropagationDelay` do. Pass `{ enabled: false }` to disable and restore the unfiltered (fully open) cutoff.
+
+```ts
+// Enable with defaults
+audio.setAirAbsorption({ enabled: true });
+
+// Muffle over a shorter range, and cap how dull distant sounds get
+audio.setAirAbsorption({ enabled: true, falloffDistance: 200, minCutoffFrequency: 2000 });
+
+// Disable
+audio.setAirAbsorption({ enabled: false });
+```
+
+#### AirAbsorptionConfig
+
+```ts
+interface AirAbsorptionConfig {
+  enabled:              boolean;
+  maxCutoffFrequency?:  number;  // cutoff (Hz) at distance 0 — unfiltered, default: 20000
+  minCutoffFrequency?:  number;  // cutoff (Hz) approached at long range — most muffled, default: 1000
+  falloffDistance?:     number;  // characteristic distance (m) of the exponential decay, default: 500
+  updateInterval?:      number;  // distance sampling interval (ms), default: 100
+  Q?:                   number;  // BiquadFilterNode lowpass Q, default: 0.707 (no resonance)
+  smoothing?:           number;  // setTargetAtTime time constant (s), default: 0.1
+  jumpThreshold?:       number;  // distance jump (m) that triggers a snap, default: 500
+}
+```
+
+**How it works:** each sound's audio passes through a lowpass `BiquadFilterNode` whose cutoff frequency is
+
+```
+cutoff = minCutoffFrequency + (maxCutoffFrequency − minCutoffFrequency) × e^(−distance / falloffDistance)
+```
+
+so it starts at `maxCutoffFrequency` (unfiltered) at distance 0 and decays toward `minCutoffFrequency` (most muffled) as distance grows — about 63% of the way there at one `falloffDistance`, ~95% by three. As with propagation delay, each update tick compares the new distance to the previous sample:
+
+| distance change | behaviour |
+|---|---|
+| ≤ `jumpThreshold` | Continuous motion (panning the map, a moving sound) — the cutoff is **ramped** smoothly via `AudioParam.setTargetAtTime`. |
+| > `jumpThreshold` | A discontinuity (`flyTo`/`setView`, a sound teleported via `updateSoundPosition`) — the cutoff **snaps** instantly instead of sweeping audibly across the jump. |
+
+> **Note:** this models air absorption as a single-pole lowpass with an exponential distance curve — a perceptual approximation used by most game-audio engines, not a physically exact multi-band atmospheric-absorption model (e.g. ISO 9613-1). It is independent of `setDopplerEffect` and `setPropagationDelay`; all three can be enabled together, each modeling a different aspect of real sound propagation (pitch, arrival time, and timbre respectively).
+
+---
+
 ## Master Volume
 
 ### `setMasterVolume(volume: number): void`
@@ -629,6 +678,7 @@ export type {
   ReverbConfig, ReverbPreset,
   DopplerConfig,
   PropagationDelayConfig,
+  AirAbsorptionConfig,
   DebugConfig, DebugInfo, SoundDebugInfo,
   MapAdapter,
 } from 'geospatial-audio-js';

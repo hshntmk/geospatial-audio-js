@@ -10,6 +10,7 @@ Web地図ライブラリに3D音響機能を追加する汎用JavaScriptライ�
 - **リバーブ** — 部屋・ホール・屋外プリセット、またはカスタム IR による環境音響
 - **ドップラー効果** — リスナー／音源の移動から自動算出されるピッチシフト
 - **音の伝搬遅延** — 距離 ÷ 音速に応じて、遠い音ほど遅れて届く
+- **空気による音の減衰** — 遠い音ほど音量だけでなく高音域も失われ、実際の空気による篭りを再現
 - **距離カリング** — 指定距離以上の音源を自動停止・再開
 
 ## インストール
@@ -164,6 +165,20 @@ audio.setPropagationDelay({ enabled: true, speedOfSound: 340 });
 
 // 無効化
 audio.setPropagationDelay({ enabled: false });
+```
+
+### 空気による音の減衰
+
+```ts
+// 有効化 — 遠い音ほど高音域が失われ（距離に応じてカットオフが下がるローパスフィルタ）、
+// 単に小さくなるだけでなく、こもった音に聞こえるようになります。
+audio.setAirAbsorption({ enabled: true });
+
+// より短い距離でこもらせる
+audio.setAirAbsorption({ enabled: true, falloffDistance: 200 });
+
+// 無効化
+audio.setAirAbsorption({ enabled: false });
 ```
 
 ### マスターボリューム

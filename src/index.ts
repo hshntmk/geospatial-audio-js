@@ -26,6 +26,7 @@ export type {
   ReverbPreset,
   DopplerConfig,
   PropagationDelayConfig,
+  AirAbsorptionConfig,
   DebugConfig,
   DebugInfo,
   SoundDebugInfo,

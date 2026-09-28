@@ -1,6 +1,6 @@
 {
   "name": "geospatial-audio-js",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A JavaScript library for integrating 3D spatial audio with web map libraries",
   "type": "module",
   "main": "dist/geospatial-audio-js.umd.cjs",

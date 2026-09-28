@@ -30,6 +30,10 @@ interface Sample {
  * sound teleported via updateSoundPosition — is treated as a discontinuity
  * and the delay is snapped instantly instead, avoiding an audible sweep
  * across the jump.
+ *
+ * A sound's own playback can finish (or be paused/culled) before its
+ * DelayNode has finished draining the last `delayTime` seconds of audio —
+ * that tail is left alone rather than force-zeroed, so it plays out in full.
  */
 export class PropagationDelayController {
   private soundManager: SoundManager;
@@ -95,11 +99,15 @@ export class PropagationDelayController {
     const seen = new Set<string>();
 
     for (const sound of this.soundManager.getAllSounds()) {
-      // Only delay audible, playing sounds; reset others to no delay.
+      // Only actively delay sounds currently playing. A sound whose source
+      // just finished (or was paused/culled) may still have delayed audio
+      // draining out of its DelayNode — do NOT zero its delayTime here, that
+      // would yank the read position forward and truncate/garble the tail
+      // that hasn't been heard yet. Just forget the distance sample so the
+      // next time this sound plays, its delay snaps fresh (see the `!prev`
+      // branch below) instead of ramping from a stale value.
       if (sound.state !== 'playing') {
-        if (this.samples.delete(sound.id) && sound.getPropagationDelay() !== 0) {
-          sound.setPropagationDelay(0);
-        }
+        this.samples.delete(sound.id);
         continue;
       }
 
