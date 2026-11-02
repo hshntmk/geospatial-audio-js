@@ -1,19 +1,8 @@
 # geospatial-audio-js
 
-A general-purpose JavaScript library that adds 3D spatial audio to web map libraries.
-Places geographically-positioned sound sources in 3D space using the Web Audio API's `PannerNode`. Automatically synchronizes the listener's orientation with map movement, rotation, and pitch to deliver an immersive 3D audio experience.
+A TypeScript library that places sound sources at longitude/latitude positions on a web map and plays them as 3D audio that follows the map camera's position and heading. It works with MapLibre GL JS, Leaflet and CesiumJS, and uses the Web Audio API's `PannerNode` (HRTF) for spatialization.
 
-[日本語版 README はこちら](README.ja.md)
-
-## Features
-
-- **Map library agnostic** — Adapter pattern supports MapLibre GL JS, Leaflet, and Cesium
-- **Web Audio API based** — High-quality 3D audio via HRTF
-- **Reverb** — Room, hall, and outdoor presets, or custom IR for environmental acoustics
-- **Doppler effect** — Pitch shift derived automatically from listener/source movement
-- **Propagation delay** — Distant sounds arrive later, delayed by distance / speed of sound
-- **Air absorption** — Distant sounds lose high frequencies (not just volume), like real sound muffled by air
-- **Distance culling** — Automatically stops and resumes sound sources beyond a specified distance
+[日本語版](README.ja.md)
 
 ## Installation
 
@@ -21,9 +10,11 @@ Places geographically-positioned sound sources in 3D space using the Web Audio A
 npm install geospatial-audio-js
 ```
 
-## Quick Start
+No map library is bundled. Install the one you use (maplibre-gl, leaflet or cesium) separately.
 
-### MapLibre GL JS
+## Usage
+
+This example places one sound source on a MapLibre GL JS map.
 
 ```ts
 import maplibregl from 'maplibre-gl';
@@ -38,246 +29,83 @@ const map = new maplibregl.Map({
 
 const audio = new GeospatialAudio(new MapLibreAdapter(map));
 
-// AudioContext must be resumed after a user gesture
 document.getElementById('start').addEventListener('click', async () => {
   await audio.initialize();
 
   await audio.addSound({
     id: 'birds',
-    position: [139.691, 35.691], // [longitude, latitude]
+    position: [139.691, 35.691], // [longitude, latitude, altitude in m (optional)]
     url: 'audio/birds.mp3',
     loop: true,
     autoplay: true,
     pannerOptions: {
-      refDistance: 10,    // reference distance (m) for full volume
-      maxDistance: 200,   // beyond this distance (m), sound becomes inaudible
+      refDistance: 10,   // no attenuation within this distance (m)
+      maxDistance: 200,
       rolloffFactor: 1.5,
     },
   });
 });
 ```
 
-### Leaflet
+Browsers do not allow audio to start before a user gesture, so call `initialize()` inside a click (or similar) handler. `addSound()` resolves once the audio file has been fetched and decoded.
+
+From then on, moving the map changes the direction and distance you hear each sound from. For a moving sound source, update its position with `updateSoundPosition('birds', [lng, lat, alt])`.
+
+### Leaflet and CesiumJS
+
+Swap the adapter. The rest of the API is the same.
 
 ```ts
-import L from 'leaflet';
-import { GeospatialAudio, LeafletAdapter } from 'geospatial-audio-js';
-
-const map = L.map('map').setView([35.69, 139.69], 16);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-const audio = new GeospatialAudio(new LeafletAdapter(map));
-
-document.getElementById('start').addEventListener('click', async () => {
-  await audio.initialize();
-  await audio.addSound({ id: 'birds', position: [139.691, 35.691], url: 'audio/birds.mp3', loop: true, autoplay: true });
-});
+new GeospatialAudio(new LeafletAdapter(map));
+new GeospatialAudio(new CesiumAdapter(viewer, Cesium)); // pass the Cesium namespace too
 ```
 
-### Cesium
+Where the listener is depends on the adapter:
+
+- With MapLibre and Leaflet, the listener stands at the map center at altitude 0. It turns with the map bearing, but stays level when the map is pitched. Leaflet cannot rotate, so the listener always faces north.
+- With Cesium, the listener sits at the camera position (including altitude) and uses the camera's heading, pitch and roll directly. Giving a sound an altitude affects its vertical placement as well.
+
+Calling `setListenerPosition()` or `setListenerOrientation()` stops following the map, so you can move the listener independently. Call `syncWithMap(true)` to follow the map again.
+
+## Effects and distance culling
+
+The following four effects are off by default. Each can be enabled on its own, and they can be combined.
 
 ```ts
-import * as Cesium from 'cesium';
-import { GeospatialAudio, CesiumAdapter } from 'geospatial-audio-js';
-
-const viewer = new Cesium.Viewer('cesiumContainer');
-
-const audio = new GeospatialAudio(
-  new CesiumAdapter(viewer, Cesium),
-  { distanceModel: 'inverse', panningModel: 'HRTF' },
-);
-
-document.getElementById('start').addEventListener('click', async () => {
-  await audio.initialize();
-  await audio.addSound({ id: 'birds', position: [139.691, 35.691, 0], url: 'audio/birds.mp3', loop: true, autoplay: true });
-});
+audio.setReverb({ enabled: true, type: 'hall', wet: 0.3 });  // 'room' | 'hall' | 'outdoor', or an AudioBuffer as customIR
+audio.setDopplerEffect({ enabled: true });     // shifts pitch as the distance to a sound changes
+audio.setPropagationDelay({ enabled: true });  // delays each sound by distance / speed of sound (default 343.3 m/s)
+audio.setAirAbsorption({ enabled: true });     // cuts more high frequencies the farther a sound is (lowpass filter)
 ```
 
-As you pan and rotate the map, the distance and direction to each sound source change and the 3D audio updates in real time.
-
-## Key API
-
-### Sound Management
+Distance culling starts with `initialize()`. By default, sounds farther than 5000 m are paused and resumed when they come back in range, and at most 10 sounds play at once, nearest to the listener first.
 
 ```ts
-// Add (async — fetches and decodes the audio file)
-await audio.addSound({ id, position, url, loop, volume, autoplay, pannerOptions });
-
-// Playback control
-audio.playSound('id');
-audio.pauseSound('id');
-audio.stopSound('id');
-audio.setVolume('id', 0.5);
-audio.removeSound('id');
-
-// Update position (for moving sound sources)
-audio.updateSoundPosition('id', [lng, lat, altitude]);
+audio.setOptimization({ cullingDistance: 2000, maxActiveSounds: 20 });
 ```
 
-### Listener (Camera) Management
+All methods and options, including playback control, events and debug info, are listed in [docs/api.md](docs/api.md).
 
-```ts
-// Auto-sync with the map camera (enabled by default)
-audio.syncWithMap(true);
+## Limitations
 
-// Set position and orientation manually
-audio.setListenerPosition([lng, lat, altitude]);
-audio.setListenerOrientation(bearing, pitch, roll);
-```
+- Longitude/latitude is converted to audio-space coordinates (meters) with an equirectangular approximation. Direction and distance errors grow the farther a sound is from the listener.
+- Reverb is applied to the combined output of all sounds. Sounds cannot have different reverbs.
+- The Doppler effect, propagation delay and air absorption are computed from the distance to each sound, sampled every 100 ms (configurable with `updateInterval`).
+- Propagation delay is capped at 5 seconds (about 1.7 km at 343.3 m/s). `maxDelayTime` changes the cap, but only for sounds added after the change.
+- There are no adapters for Google Maps or OpenLayers. Other map libraries can be used by implementing the `MapAdapter` interface.
+- Supported browsers are the latest Chrome, Edge, Firefox and Safari (iOS 14+).
 
-### Reverb (Environmental Acoustics)
+## Demos
 
-```ts
-// Use a preset
-audio.setReverb({
-  enabled: true,
-  type: 'room',   // 'room' | 'hall' | 'outdoor'
-  wet: 0.3,
-  dry: 0.7,
-});
+Clone the repository, run `npm install`, then run one of the following and open http://localhost:5173/.
 
-// Disable reverb
-audio.disableReverb();
-```
-
-### Doppler Effect
-
-```ts
-// Enable — pitch shift is derived automatically from how the distance
-// to each playing sound changes (moving sounds and map movement alike)
-audio.setDopplerEffect({ enabled: true });
-
-// Exaggerate the effect
-audio.setDopplerEffect({ enabled: true, dopplerFactor: 1.5 });
-
-// Disable
-audio.setDopplerEffect({ enabled: false });
-```
-
-### Propagation Delay
-
-```ts
-// Enable — each sound is delayed by distance / speedOfSound, so it arrives
-// later the farther away it is. Follows moving sounds and map movement;
-// continuous motion ramps smoothly, map jumps (flyTo/setView) snap instantly.
-audio.setPropagationDelay({ enabled: true });
-
-// Custom speed of sound
-audio.setPropagationDelay({ enabled: true, speedOfSound: 340 });
-
-// Disable
-audio.setPropagationDelay({ enabled: false });
-```
-
-### Air Absorption
-
-```ts
-// Enable — distant sounds lose high frequencies (a lowpass filter whose
-// cutoff decays with distance), so they sound muffled, not just quieter.
-audio.setAirAbsorption({ enabled: true });
-
-// Muffle over a shorter range
-audio.setAirAbsorption({ enabled: true, falloffDistance: 200 });
-
-// Disable
-audio.setAirAbsorption({ enabled: false });
-```
-
-### Master Volume
-
-```ts
-audio.setMasterVolume(0.8); // 0.0 – 1.0
-```
-
-### Performance Optimization
-
-```ts
-audio.setOptimization({
-  maxActiveSounds: 10,    // maximum number of simultaneously playing sounds
-  cullingDistance: 5000,  // automatically stop sounds beyond this distance (m)
-  updateInterval: 100,    // culling update interval (ms)
-});
-```
-
-### Debug
-
-```ts
-// Enable debug mode (logs to console)
-audio.enableDebug({ logAudioParams: true, logPerformance: true });
-
-// Get a snapshot of the current audio state
-const info = audio.getDebugInfo();
-// {
-//   activeSounds: 3,
-//   totalSounds: 6,
-//   culledSounds: 2,
-//   audioContext: { state: 'running', sampleRate: 48000, currentTime: 12.5 },
-//   sounds: [{ id: 'birds', state: 'playing', volume: 0.8, distanceFromListener: 42 }, ...]
-// }
-
-audio.disableDebug();
-```
-
-### Events
-
-```ts
-audio.on('soundLoaded',   (id) => console.log(`${id} loaded`));
-audio.on('soundPlaying',  (id) => { /* ... */ });
-audio.on('soundCulled',   (id) => console.log(`${id} is too far`));
-audio.on('soundUnculled', (id) => console.log(`${id} is in range again`));
-audio.on('soundError',    (id, err) => console.error(err));
-```
-
-### Lifecycle
-
-```ts
-// Initialize (call after a user gesture)
-await audio.initialize();
-
-// Clean up
-audio.dispose();
-```
-
-## Demo
-
-See the demos to experience the library in action. For details, see [docs/demo.md](docs/demo.md).
-
-| Demo | Command |
+| Command | Content |
 |---|---|
-| MapLibre GL JS (2D/3D) | `npm run dev:demo` |
-| CesiumJS (3D Globe) | `npm run dev:demo-cesium` |
+| `npm run dev:demo-maplibre` | MapLibre GL JS (2D/3D) |
+| `npm run dev:demo-cesium` | CesiumJS |
 
-```bash
-# MapLibre demo
-npm run dev:demo
+The demo UI is in Japanese. See [docs/demo.md](docs/demo.md) for a walkthrough and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-# Cesium demo
-npm run dev:demo-cesium
-```
+## License
 
-Both are available at `http://localhost:5173/`.
-
-## Documentation
-
-| Document | Description |
-|---|---|
-| [docs/api.md](docs/api.md) | **API Reference** (all methods and type definitions) |
-| [docs/demo.md](docs/demo.md) | Demo setup and walkthrough |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes (including breaking changes) |
-
-## Browser Support
-
-Browsers that support the Web Audio API (`PannerNode`):
-
-- Chrome / Edge (latest)
-- Firefox (latest)
-- Safari (latest, iOS 14+)
-
-## Supported Map Libraries
-
-| Library | Status |
-|---|---|
-| MapLibre GL JS | ✅ Supported |
-| Leaflet | ✅ Supported |
-| Cesium | ✅ Supported |
-| Google Maps | 🔜 Planned (Phase 3) |
+[MIT](LICENSE)

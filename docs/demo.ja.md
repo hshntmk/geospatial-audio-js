@@ -8,7 +8,7 @@
 
 | デモ | 地図ライブラリ | 起動コマンド |
 |---|---|---|
-| MapLibre デモ | MapLibre GL JS（2D/3D） | `npm run dev:demo` |
+| MapLibre デモ | MapLibre GL JS（2D/3D） | `npm run dev:demo-maplibre` |
 | Cesium デモ | CesiumJS（3D 地球儀） | `npm run dev:demo-cesium` |
 
 ---
@@ -19,7 +19,7 @@
 
 ```bash
 npm install
-npm run dev:demo
+npm run dev:demo-maplibre
 ```
 
 ブラウザで `http://localhost:5173/` を開き、**「オーディオを開始」** ボタンをクリックしてください。

@@ -8,7 +8,7 @@
 
 | Demo | Map Library | Command |
 |---|---|---|
-| MapLibre Demo | MapLibre GL JS (2D/3D) | `npm run dev:demo` |
+| MapLibre Demo | MapLibre GL JS (2D/3D) | `npm run dev:demo-maplibre` |
 | Cesium Demo | CesiumJS (3D Globe) | `npm run dev:demo-cesium` |
 
 ---
@@ -19,7 +19,7 @@
 
 ```bash
 npm install
-npm run dev:demo
+npm run dev:demo-maplibre
 ```
 
 Open `http://localhost:5173/` in your browser and click the **"Start Audio"** button.

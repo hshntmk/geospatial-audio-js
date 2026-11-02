@@ -1,17 +1,8 @@
 # geospatial-audio-js
 
-Web地図ライブラリに3D音響機能を追加する汎用JavaScriptライブラリです。
-地図上の地理座標を持つ音源を、Web Audio API の `PannerNode` を使って3D空間に配置します。地図の移動・回転・ピッチに合わせてリスナーの向きを自動同期し、立体音響体験を実現します。
+Web 地図上の経緯度に音源を置き、地図のカメラ位置と向きに合わせて立体音響で鳴らす TypeScript ライブラリです。MapLibre GL JS、Leaflet、CesiumJS で使えます。音の定位には Web Audio API の `PannerNode`（HRTF）を使っています。
 
-## 特徴
-
-- **地図ライブラリ非依存** — アダプターパターンで MapLibre GL JS・Leaflet・Cesium に対応
-- **Web Audio API ベース** — HRTF による高品質な3D音響
-- **リバーブ** — 部屋・ホール・屋外プリセット、またはカスタム IR による環境音響
-- **ドップラー効果** — リスナー／音源の移動から自動算出されるピッチシフト
-- **音の伝搬遅延** — 距離 ÷ 音速に応じて、遠い音ほど遅れて届く
-- **空気による音の減衰** — 遠い音ほど音量だけでなく高音域も失われ、実際の空気による篭りを再現
-- **距離カリング** — 指定距離以上の音源を自動停止・再開
+[English](README.md)
 
 ## インストール
 
@@ -19,9 +10,11 @@ Web地図ライブラリに3D音響機能を追加する汎用JavaScriptライ�
 npm install geospatial-audio-js
 ```
 
-## クイックスタート
+地図ライブラリは同梱していません。使うもの（maplibre-gl、leaflet、cesium のいずれか）は別にインストールしてください。
 
-### MapLibre GL JS
+## 使い方
+
+MapLibre GL JS の地図に音源を 1 つ置く例です。
 
 ```ts
 import maplibregl from 'maplibre-gl';
@@ -36,249 +29,82 @@ const map = new maplibregl.Map({
 
 const audio = new GeospatialAudio(new MapLibreAdapter(map));
 
-// AudioContext はユーザー操作後に解放される
 document.getElementById('start').addEventListener('click', async () => {
   await audio.initialize();
 
   await audio.addSound({
     id: 'birds',
-    position: [139.691, 35.691], // [longitude, latitude]
+    position: [139.691, 35.691], // [経度, 緯度, 高度(m, 省略可)]
     url: 'audio/birds.mp3',
     loop: true,
     autoplay: true,
     pannerOptions: {
-      refDistance: 10,    // この距離（m）で基準音量
-      maxDistance: 200,   // この距離（m）以上では聴こえなくなる
+      refDistance: 10,   // この距離(m)までは減衰しない
+      maxDistance: 200,
       rolloffFactor: 1.5,
     },
   });
 });
 ```
 
-### Leaflet
+ブラウザはユーザー操作の前に音を鳴らせないため、`initialize()` はクリックなどのイベントハンドラの中で呼びます。`addSound()` は音声ファイルを取得してデコードし終わるまで待ちます。
+
+あとは地図を動かすと、音源の聞こえる方向と距離が変わります。移動する音源は `updateSoundPosition('birds', [lng, lat, alt])` で位置を更新します。
+
+### Leaflet と CesiumJS
+
+アダプターを差し替えれば、ほかの API は同じです。
 
 ```ts
-import L from 'leaflet';
-import { GeospatialAudio, LeafletAdapter } from 'geospatial-audio-js';
-
-const map = L.map('map').setView([35.69, 139.69], 16);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-const audio = new GeospatialAudio(new LeafletAdapter(map));
-
-document.getElementById('start').addEventListener('click', async () => {
-  await audio.initialize();
-  await audio.addSound({ id: 'birds', position: [139.691, 35.691], url: 'audio/birds.mp3', loop: true, autoplay: true });
-});
+new GeospatialAudio(new LeafletAdapter(map));
+new GeospatialAudio(new CesiumAdapter(viewer, Cesium)); // Cesium 名前空間も渡す
 ```
 
-### Cesium
+リスナー（聞き手）の位置は、アダプターによって次のように決まります。
+
+- MapLibre と Leaflet では、リスナーは地図の中心に高度 0 で立っています。向きは地図の bearing に合わせますが、地図を傾けても（pitch）リスナーは水平を向いたままです。Leaflet は回転できないので常に北を向いています。
+- Cesium では、カメラの位置（高度を含む）にリスナーを置き、カメラの heading、pitch、roll をそのまま使います。音源に高度を指定すると上下の定位にも効きます。
+
+`setListenerPosition()` か `setListenerOrientation()` を呼ぶと地図への追従が止まり、リスナーを地図とは別に動かせます。追従に戻すには `syncWithMap(true)` を呼びます。
+
+## 音響効果と距離カリング
+
+次の 4 つの効果は既定で無効です。個別に有効にでき、同時に使うこともできます。
 
 ```ts
-import * as Cesium from 'cesium';
-import { GeospatialAudio, CesiumAdapter } from 'geospatial-audio-js';
-
-const viewer = new Cesium.Viewer('cesiumContainer');
-
-const audio = new GeospatialAudio(
-  new CesiumAdapter(viewer, Cesium),
-  { distanceModel: 'inverse', panningModel: 'HRTF' },
-);
-
-document.getElementById('start').addEventListener('click', async () => {
-  await audio.initialize();
-  await audio.addSound({ id: 'birds', position: [139.691, 35.691, 0], url: 'audio/birds.mp3', loop: true, autoplay: true });
-});
+audio.setReverb({ enabled: true, type: 'hall', wet: 0.3 });  // 'room' | 'hall' | 'outdoor'、または customIR に AudioBuffer
+audio.setDopplerEffect({ enabled: true });     // 音源とリスナーの距離の変化からピッチを変える
+audio.setPropagationDelay({ enabled: true });  // 距離 ÷ 音速(既定 343.3 m/s)だけ遅れて届く
+audio.setAirAbsorption({ enabled: true });     // 遠い音ほど高音域を削る(ローパスフィルタ)
 ```
 
-地図を移動するだけで音源との距離・方向が変わり、3D音響が追従します。
-
-## 主なAPI
-
-### 音源管理
+距離カリングは `initialize()` の時点で有効になります。既定では 5000 m より遠い音源を一時停止し、範囲内に戻ると再開します。同時に再生するのはリスナーに近い順に 10 個までです。
 
 ```ts
-// 追加（非同期 — 音声ファイルを fetch してデコード）
-await audio.addSound({ id, position, url, loop, volume, autoplay, pannerOptions });
-
-// 制御
-audio.playSound('id');
-audio.pauseSound('id');
-audio.stopSound('id');
-audio.setVolume('id', 0.5);
-audio.removeSound('id');
-
-// 位置更新（移動する音源向け）
-audio.updateSoundPosition('id', [lng, lat, altitude]);
+audio.setOptimization({ cullingDistance: 2000, maxActiveSounds: 20 });
 ```
 
-### リスナー（カメラ）管理
+再生制御、イベント、デバッグ情報の取得を含む全メソッドと設定項目は [docs/api.ja.md](docs/api.ja.md) にあります。
 
-```ts
-// 地図カメラとの自動同期（デフォルト有効）
-audio.syncWithMap(true);
+## 制限事項
 
-// 手動で位置・向きを設定
-audio.setListenerPosition([lng, lat, altitude]);
-audio.setListenerOrientation(bearing, pitch, roll);
-```
-
-### リバーブ（環境音響）
-
-```ts
-// プリセットを使う
-audio.setReverb({
-  enabled: true,
-  type: 'room',   // 'room' | 'hall' | 'outdoor'
-  wet: 0.3,
-  dry: 0.7,
-});
-
-// リバーブを無効化
-audio.disableReverb();
-```
-
-### ドップラー効果
-
-```ts
-// 有効化 — ピッチシフトは各再生中の音源との距離変化から自動算出されます
-//（移動する音源・地図移動の両方に追従）
-audio.setDopplerEffect({ enabled: true });
-
-// 効果を強調
-audio.setDopplerEffect({ enabled: true, dopplerFactor: 1.5 });
-
-// 無効化
-audio.setDopplerEffect({ enabled: false });
-```
-
-### 音の伝搬遅延
-
-```ts
-// 有効化 — 各音源は distance / speedOfSound 秒だけ遅延して届くようになり、
-// 遠い音ほど遅れて聞こえます。音源の移動・地図移動の両方に追従し、
-// 連続した動きはなめらかに、地図のジャンプ（flyTo/setView）は瞬時に反映されます。
-audio.setPropagationDelay({ enabled: true });
-
-// 音速を指定
-audio.setPropagationDelay({ enabled: true, speedOfSound: 340 });
-
-// 無効化
-audio.setPropagationDelay({ enabled: false });
-```
-
-### 空気による音の減衰
-
-```ts
-// 有効化 — 遠い音ほど高音域が失われ（距離に応じてカットオフが下がるローパスフィルタ）、
-// 単に小さくなるだけでなく、こもった音に聞こえるようになります。
-audio.setAirAbsorption({ enabled: true });
-
-// より短い距離でこもらせる
-audio.setAirAbsorption({ enabled: true, falloffDistance: 200 });
-
-// 無効化
-audio.setAirAbsorption({ enabled: false });
-```
-
-### マスターボリューム
-
-```ts
-audio.setMasterVolume(0.8); // 0.0 〜 1.0
-```
-
-### パフォーマンス最適化
-
-```ts
-audio.setOptimization({
-  maxActiveSounds: 10,    // 同時再生数の上限
-  cullingDistance: 5000,  // この距離（m）以上の音源を自動停止
-  updateInterval: 100,    // カリング更新間隔（ms）
-});
-```
-
-### デバッグ
-
-```ts
-// デバッグモードを有効化（コンソールへのログ出力）
-audio.enableDebug({ logAudioParams: true, logPerformance: true });
-
-// 現在の音響状態スナップショットを取得
-const info = audio.getDebugInfo();
-// {
-//   activeSounds: 3,
-//   totalSounds: 6,
-//   culledSounds: 2,
-//   audioContext: { state: 'running', sampleRate: 48000, currentTime: 12.5 },
-//   sounds: [{ id: 'birds', state: 'playing', volume: 0.8, distanceFromListener: 42 }, ...]
-// }
-
-audio.disableDebug();
-```
-
-### イベント
-
-```ts
-audio.on('soundLoaded',   (id) => console.log(`${id} loaded`));
-audio.on('soundPlaying',  (id) => { /* ... */ });
-audio.on('soundCulled',   (id) => console.log(`${id} is too far`));
-audio.on('soundUnculled', (id) => console.log(`${id} is in range again`));
-audio.on('soundError',    (id, err) => console.error(err));
-```
-
-### ライフサイクル
-
-```ts
-// 初期化（ユーザー操作後に呼ぶ）
-await audio.initialize();
-
-// 後片付け
-audio.dispose();
-```
+- 経緯度から音響空間の座標（メートル）への変換には正距円筒近似を使っています。リスナーから遠い音源ほど方向と距離の誤差が大きくなります。
+- リバーブは全音源の出力にまとめてかかります。音源ごとに違うリバーブはかけられません。
+- ドップラー効果、伝搬遅延、空気吸収は、音源までの距離を 100 ms ごと（`updateInterval` で変更可）に測って計算します。
+- 伝搬遅延の上限は 5 秒（音速 343.3 m/s で約 1.7 km）です。`maxDelayTime` で変えられますが、変更後に追加した音源にしか効きません。
+- Google Maps と OpenLayers のアダプターはありません。`MapAdapter` インターフェースを実装すれば、ほかの地図ライブラリでも使えます。
+- 対応ブラウザは Chrome、Edge、Firefox、Safari（iOS 14 以降）の最新版です。
 
 ## デモ
 
-実際の動作はデモで確認できます。詳細は [docs/demo.md](docs/demo.md) を参照してください。
+リポジトリを clone して `npm install` したあと、次のどちらかを実行して http://localhost:5173/ を開きます。
 
-| デモ | 起動コマンド |
+| コマンド | 内容 |
 |---|---|
-| MapLibre GL JS（2D/3D） | `npm run dev:demo` |
-| CesiumJS（3D 地球儀） | `npm run dev:demo-cesium` |
+| `npm run dev:demo-maplibre` | MapLibre GL JS（2D/3D） |
+| `npm run dev:demo-cesium` | CesiumJS |
 
-```bash
-# MapLibre デモ
-npm run dev:demo
-
-# Cesium デモ
-npm run dev:demo-cesium
-```
-
-いずれも `http://localhost:5173/` で確認できます。
-
-## ドキュメント
-
-| ドキュメント | 内容 |
-|---|---|
-| [docs/api.md](docs/api.md) | **APIリファレンス**（全メソッド・型定義） |
-| [docs/demo.md](docs/demo.md) | デモの起動・解説 |
-| [CHANGELOG.md](CHANGELOG.md) | リリースノート（破壊的変更を含む） |
-
-## 対応ブラウザ
-
-Web Audio API (`PannerNode`) に対応した以下のブラウザ:
-
-- Chrome / Edge 最新版
-- Firefox 最新版
-- Safari 最新版（iOS 14+）
-
-## 対応地図ライブラリ
-
-| ライブラリ | 状況 |
-|---|---|
-| MapLibre GL JS | ✅ 対応済み |
-| Leaflet | ✅ 対応済み |
-| Cesium | ✅ 対応済み |
-| Google Maps | 🔜 Phase 3 予定 |
+デモの画面は日本語です。説明は [docs/demo.ja.md](docs/demo.ja.md) にあります。変更履歴は [CHANGELOG.md](CHANGELOG.md) を見てください。
 
 ## ライセンス
 

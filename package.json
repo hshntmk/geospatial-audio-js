@@ -23,8 +23,8 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "dev:demo": "vite --config demo/vite.config.ts",
-    "build:demo": "vite build --config demo/vite.config.ts",
+    "dev:demo-maplibre": "vite --config demo/vite.config.ts",
+    "build:demo-maplibre": "vite build --config demo/vite.config.ts",
     "dev:demo-cesium": "vite --config demo-cesium/vite.config.ts",
     "build:demo-cesium": "vite build --config demo-cesium/vite.config.ts",
     "test": "vitest",
@@ -63,7 +63,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hshntmk/geospatial-audio-js.git"
+    "url": "git+https://github.com/hshntmk/geospatial-audio-js.git"
   },
   "homepage": "https://github.com/hshntmk/geospatial-audio-js#readme",
   "bugs": {
