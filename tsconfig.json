@@ -18,5 +18,5 @@
       "geospatial-audio-js": ["./src/index.ts"]
     }
   },
-  "include": ["src", "tests", "demo", "demo-cesium", "demo-intro"]
+  "include": ["src", "tests", "demo", "demo-cesium"]
 }

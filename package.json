@@ -27,8 +27,6 @@
     "build:demo": "vite build --config demo/vite.config.ts",
     "dev:demo-cesium": "vite --config demo-cesium/vite.config.ts",
     "build:demo-cesium": "vite build --config demo-cesium/vite.config.ts",
-    "dev:demo-intro": "vite --config demo-intro/vite.config.ts",
-    "build:demo-intro": "vite build --config demo-intro/vite.config.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
