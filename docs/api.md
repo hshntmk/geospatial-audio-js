@@ -241,6 +241,9 @@ audio.setReverb({ enabled: true, decay: 2.5, wet: 0.4, dry: 0.8 });
 
 // Use a custom impulse response (AudioBuffer)
 audio.setReverb({ enabled: true, customIR: myIRBuffer, wet: 0.5 });
+
+// Distance-based: far sounds come out wetter
+audio.setReverb({ enabled: true, type: 'outdoor', distanceRolloff: 0.2 });
 ```
 
 #### ReverbConfig
@@ -253,6 +256,7 @@ interface ReverbConfig {
   wet?:       number;      // reverb mix 0–1 (default: 0.3)
   dry?:       number;      // direct signal 0–1 (default: 1.0)
   customIR?:  AudioBuffer; // custom impulse response
+  distanceRolloff?: number; // makes the reverb depend on distance (see below). Default: off
 }
 ```
 
@@ -266,11 +270,32 @@ interface ReverbConfig {
 
 > **How it works:** Uses algorithmically generated impulse responses (white noise × exponential decay). No external IR files required.
 
+#### Distance-based reverb (`distanceRolloff`)
+
+By default the reverb is applied to the mix of all sounds, so the reverb-to-direct ratio is the same at any distance. In real spaces the direct sound fades with distance while the reverberation stays at a similar level, so far sounds sound wetter, which is a strong cue for distance.
+
+With `distanceRolloff` set, each sound feeds the reverb through its own send, taken before its `PannerNode`. The send level follows the inverse distance model with the sound's own `refDistance`:
+
+```
+send = refDistance / (refDistance + distanceRolloff × (max(distance, refDistance) − refDistance))
+```
+
+Set `distanceRolloff` lower than the panner's `rolloffFactor` (default 1) so the reverb fades more slowly than the direct sound. `0` keeps the reverb level the same at any distance. With `rolloffFactor: 1` and `distanceRolloff: 0.2`, the reverb-to-direct ratio rises by about 9 dB at 5 × `refDistance` and 12 dB at 20 × `refDistance`, compared with `refDistance`.
+
+> **Note:** the send is taken before the panner, so the reverb carries no direction, and it is mono going into the convolver. At `refDistance` it is therefore about 2–3 dB louder than in the default mode with the same `wet`, where the reverb gets the panned signal.
+
 #### Internal Audio Graph (when reverb is enabled)
 
 ```
 masterGain ─┬─ dryGain ─────────────── destination
              └─ reverbGain ─ convolver ─ destination
+```
+
+With `distanceRolloff`:
+
+```
+each sound: … ─ volume ─┬─ PannerNode ─ masterGain ─ dryGain ─ destination
+                        └─ reverb send ─ reverbSendBus ─ reverbGain ─ convolver ─ destination
 ```
 
 ### `disableReverb(): void`

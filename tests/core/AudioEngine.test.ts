@@ -43,3 +43,59 @@ describe('AudioEngine.contextTimeAt', () => {
     expect(engine.contextTimeAt(12_000)).toBeCloseTo(3, 10);
   });
 });
+
+describe('AudioEngine reverb wiring', () => {
+  type Node = { connections: unknown[]; gain?: { value: number } };
+
+  function setup() {
+    const engine = new AudioEngine();
+    const ctx = engine.getContext() as unknown as { destination: unknown };
+    const master = engine.getMasterGain() as unknown as Node;
+    const sendBus = engine.getReverbSendBus() as unknown as Node;
+    return { engine, ctx, master, sendBus };
+  }
+
+  it('feeds the mix of all sounds into the reverb when distanceRolloff is omitted', () => {
+    const { engine, master, sendBus } = setup();
+    engine.setReverb({ enabled: true, type: 'room' });
+
+    expect(master.connections).toHaveLength(2); // dryGain and reverbGain
+    expect(sendBus.connections).toHaveLength(0);
+    expect(engine.getReverbDistanceRolloff()).toBeNull();
+  });
+
+  it('feeds the reverb from the per-sound send bus when distanceRolloff is set', () => {
+    const { engine, master, sendBus } = setup();
+    engine.setReverb({ enabled: true, type: 'room', distanceRolloff: 0.3 });
+
+    expect(master.connections).toHaveLength(1); // dryGain only
+    expect(sendBus.connections).toHaveLength(1); // reverbGain
+    expect(engine.getReverbDistanceRolloff()).toBe(0.3);
+  });
+
+  it('rewires when switching between the two modes', () => {
+    const { engine, master, sendBus } = setup();
+    engine.setReverb({ enabled: true, distanceRolloff: 0.3 });
+    engine.setReverb({ enabled: true });
+
+    expect(master.connections).toHaveLength(2);
+    expect(sendBus.connections).toHaveLength(0);
+  });
+
+  it('restores the plain graph and turns distance mode off when disabled', () => {
+    const { engine, ctx, master, sendBus } = setup();
+    engine.setReverb({ enabled: true, distanceRolloff: 0.3 });
+    engine.disableReverb();
+
+    expect(master.connections).toEqual([ctx.destination]);
+    expect(sendBus.connections).toHaveLength(0);
+    expect(engine.getReverbDistanceRolloff()).toBeNull();
+  });
+
+  it('applies the master volume to the reverb sends too', () => {
+    const { engine, master, sendBus } = setup();
+    engine.setMasterVolume(0.4);
+    expect(master.gain!.value).toBe(0.4);
+    expect(sendBus.gain!.value).toBe(0.4);
+  });
+});

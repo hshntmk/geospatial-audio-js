@@ -10,11 +10,14 @@ import { EventEmitter } from '../utils/EventEmitter.js';
 const DELAY_LOOKAHEAD = 0.1;
 /** A ramp ending closer to `currentTime` than this (seconds) is treated as finished. */
 const DELAY_SCHEDULE_MARGIN = 0.02;
+/** Time constant (seconds) for reverb-send changes, so per-frame updates don't zipper. */
+const REVERB_SEND_SMOOTHING = 0.05;
 
 /**
  * Represents a single positioned audio source.
  * Manages its own Web Audio graph:
- * BufferSource → DelayNode → BiquadFilterNode → PannerNode → GainNode → masterGain.
+ * BufferSource → DelayNode → BiquadFilterNode → GainNode ─┬─ PannerNode → masterGain
+ *                                                         └─ reverbSend → reverbSendBus
  */
 export class SoundSource extends EventEmitter {
   readonly id: string;
@@ -28,6 +31,9 @@ export class SoundSource extends EventEmitter {
   private filterNode: BiquadFilterNode;
   private panner: PannerNode;
   private gainNode: GainNode;
+  /** This sound's feed into distance-based reverb (see updateReverbSend). */
+  private reverbSend: GainNode;
+  private reverbSendLevel = 0;
 
   private _state: SoundState = 'ready';
   private _geoPosition: Position;
@@ -60,10 +66,13 @@ export class SoundSource extends EventEmitter {
     this.delayNode = audioEngine.createDelayNode();
     this.filterNode = audioEngine.createFilterNode();
     this.gainNode = audioEngine.createGainNode(config.volume ?? 1.0);
+    this.reverbSend = audioEngine.createGainNode(0);
     this.delayNode.connect(this.filterNode);
-    this.filterNode.connect(this.panner);
-    this.panner.connect(this.gainNode);
-    this.gainNode.connect(audioEngine.getMasterGain());
+    this.filterNode.connect(this.gainNode);
+    this.gainNode.connect(this.panner);
+    this.panner.connect(audioEngine.getMasterGain());
+    this.gainNode.connect(this.reverbSend);
+    this.reverbSend.connect(audioEngine.getReverbSendBus());
   }
 
   play(): void {
@@ -133,6 +142,39 @@ export class SoundSource extends EventEmitter {
     } else {
       (p as unknown as { setPosition(x: number, y: number, z: number): void }).setPosition(pos.x, pos.y, pos.z);
     }
+    this.updateReverbSend();
+  }
+
+  /**
+   * Sets how much of this sound feeds distance-based reverb
+   * (ReverbConfig.distanceRolloff): the inverse distance model with this
+   * sound's refDistance and the reverb's own rolloff. The send is taken
+   * before the PannerNode, so the reverb fades only by this curve, more
+   * slowly than the direct sound, and carries no direction. 0 when
+   * distance-based reverb is off.
+   */
+  updateReverbSend(): void {
+    const rolloff = this.audioEngine.getReverbDistanceRolloff();
+    let level = 0;
+    if (rolloff !== null) {
+      const { x, y, z } = this._audioPosition;
+      const ref = this.panner.refDistance;
+      const denominator = ref + rolloff * (Math.max(Math.hypot(x, y, z), ref) - ref);
+      level = denominator > 0 ? ref / denominator : 1;
+    }
+    if (level === this.reverbSendLevel) return;
+    this.reverbSendLevel = level;
+
+    const param = this.reverbSend.gain;
+    if (typeof param.setTargetAtTime === 'function') {
+      param.setTargetAtTime(level, this.audioEngine.getContext().currentTime, REVERB_SEND_SMOOTHING);
+    } else {
+      param.value = level;
+    }
+  }
+
+  getReverbSendLevel(): number {
+    return this.reverbSendLevel;
   }
 
   setVolume(volume: number): void {
@@ -279,6 +321,7 @@ export class SoundSource extends EventEmitter {
     this.filterNode.disconnect();
     this.panner.disconnect();
     this.gainNode.disconnect();
+    this.reverbSend.disconnect();
     this.removeAllListeners();
   }
 }

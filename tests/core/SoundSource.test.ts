@@ -70,6 +70,8 @@ describe('SoundSource', () => {
         createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
 
       const sound = new SoundSource('s', makeAudioBuffer(10), engine, makeConfig({ loop: false }));
@@ -104,6 +106,8 @@ describe('SoundSource', () => {
         createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
 
       const sound = new SoundSource('s', makeAudioBuffer(bufferDuration), engine, makeConfig({ loop: true }));
@@ -128,6 +132,8 @@ describe('SoundSource', () => {
         createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
 
       const sound = new SoundSource('s', makeAudioBuffer(bufferDuration), engine, makeConfig({ loop: true }));
@@ -160,6 +166,8 @@ describe('SoundSource', () => {
         createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
 
       const sound = new SoundSource('s', makeAudioBuffer(5), engine, makeConfig());
@@ -180,6 +188,8 @@ describe('SoundSource', () => {
         createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
 
       const sound = new SoundSource('s', makeAudioBuffer(5), engine, makeConfig());
@@ -207,6 +217,8 @@ describe('SoundSource', () => {
         createFilterNode: () => makeFilterNode(),
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
     }
 
@@ -321,6 +333,8 @@ describe('SoundSource', () => {
         createFilterNode: () => filterNode,
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
 
       const sound = new SoundSource('s', makeAudioBuffer(5), engine, makeConfig());
@@ -328,7 +342,7 @@ describe('SoundSource', () => {
 
       expect(source.connect).toHaveBeenCalledWith(delayNode);
       expect(delayNode.connect).toHaveBeenCalledWith(filterNode);
-      expect(filterNode.connect).toHaveBeenCalledWith(panner);
+      expect(filterNode.connect).toHaveBeenCalledWith(gain); // volume, then the panner
     });
   });
 
@@ -343,6 +357,8 @@ describe('SoundSource', () => {
         createFilterNode: () => filterNode,
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
     }
 
@@ -378,7 +394,7 @@ describe('SoundSource', () => {
       expect(sound.getAirAbsorptionCutoff()).toBe(0);
     });
 
-    it('routes the delay node through the filter node into the panner', () => {
+    it('routes the delay node through the filter node and the volume into the panner', () => {
       const delayNode = makeDelayNode();
       const filterNode = makeFilterNode();
       const panner = { positionX: { value: 0 }, positionY: { value: 0 }, positionZ: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() } as unknown as PannerNode;
@@ -390,12 +406,76 @@ describe('SoundSource', () => {
         createFilterNode: () => filterNode,
         createGainNode: () => gain,
         getMasterGain: () => gain,
+        getReverbSendBus: () => gain,
+        getReverbDistanceRolloff: () => null,
       } as unknown as AudioEngine;
 
       new SoundSource('s', makeAudioBuffer(5), engine, makeConfig());
 
       expect(delayNode.connect).toHaveBeenCalledWith(filterNode);
-      expect(filterNode.connect).toHaveBeenCalledWith(panner);
+      expect(filterNode.connect).toHaveBeenCalledWith(gain); // volume
+      expect(gain.connect).toHaveBeenCalledWith(panner);
+    });
+  });
+
+  describe('distance-based reverb send', () => {
+    function makeGain() {
+      return {
+        gain: { value: 1, setTargetAtTime: vi.fn(function (this: { value: number }, v: number) { this.value = v; }) },
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      };
+    }
+
+    function setup(rolloff: number | null) {
+      const panner = { refDistance: 10, positionX: { value: 0 }, positionY: { value: 0 }, positionZ: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() };
+      const gains = [makeGain(), makeGain()]; // volume, reverb send
+      const master = makeGain(), sendBus = makeGain();
+      const engine = {
+        getContext: () => ({ currentTime: 0, createBufferSource: () => makeSource({ offset: 0 }) }),
+        createPannerNode: () => panner,
+        createDelayNode: () => makeDelayNode(),
+        createFilterNode: () => makeFilterNode(),
+        createGainNode: (initial = 1) => { const g = gains.shift()!; g.gain.value = initial; return g; },
+        getMasterGain: () => master,
+        getReverbSendBus: () => sendBus,
+        getReverbDistanceRolloff: () => rolloff,
+      };
+      const [volume, send] = gains;
+      const sound = new SoundSource('s', makeAudioBuffer(5), engine as unknown as AudioEngine, makeConfig());
+      return { sound, panner, volume, send, sendBus };
+    }
+
+    it('taps the send after the volume, before the PannerNode, into the reverb send bus', () => {
+      const { panner, volume, send, sendBus } = setup(0.5);
+      expect(volume.connect).toHaveBeenCalledWith(panner);
+      expect(volume.connect).toHaveBeenCalledWith(send);
+      expect(send.connect).toHaveBeenCalledWith(sendBus);
+      expect(send.gain.value).toBe(0); // silent until positioned
+    });
+
+    it('follows the inverse distance model with the reverb\'s own rolloff', () => {
+      const { sound, send } = setup(0.5);
+
+      sound.setPosition({ x: 6, y: 0, z: -8 }); // 10 m = refDistance
+      expect(send.gain.value).toBeCloseTo(1, 10);
+
+      sound.setPosition({ x: 50, y: 0, z: 0 }); // 10 / (10 + 0.5 × 40)
+      expect(send.gain.value).toBeCloseTo(1 / 3, 10);
+      expect(sound.getReverbSendLevel()).toBeCloseTo(1 / 3, 10);
+    });
+
+    it('keeps the reverb level constant with rolloff 0', () => {
+      const { sound, send } = setup(0);
+      sound.setPosition({ x: 1000, y: 0, z: 0 });
+      expect(send.gain.value).toBe(1);
+    });
+
+    it('sends nothing when distance-based reverb is off', () => {
+      const { sound, send } = setup(null);
+      sound.setPosition({ x: 50, y: 0, z: 0 });
+      expect(send.gain.value).toBe(0);
+      expect(send.gain.setTargetAtTime).not.toHaveBeenCalled();
     });
   });
 });

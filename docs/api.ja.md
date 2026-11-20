@@ -242,6 +242,9 @@ audio.setReverb({ enabled: true, decay: 2.5, wet: 0.4, dry: 0.8 });
 
 // カスタムインパルス応答（AudioBuffer）を使う
 audio.setReverb({ enabled: true, customIR: myIRBuffer, wet: 0.5 });
+
+// 距離に応じて変える（遠い音ほど響きが多くなる）
+audio.setReverb({ enabled: true, type: 'outdoor', distanceRolloff: 0.2 });
 ```
 
 #### ReverbConfig
@@ -254,6 +257,7 @@ interface ReverbConfig {
   wet?:       number;      // リバーブ成分 0–1（デフォルト: 0.3）
   dry?:       number;      // 直接音 0–1（デフォルト: 1.0）
   customIR?:  AudioBuffer; // カスタムインパルス応答
+  distanceRolloff?: number; // リバーブを距離に応じて変える（下記参照）。デフォルト: 無効
 }
 ```
 
@@ -267,11 +271,32 @@ interface ReverbConfig {
 
 > **仕組み:** アルゴリズムによるインパルス応答生成（白色雑音 × 指数減衰）を使用します。外部 IR ファイルは不要です。
 
+#### 距離に応じたリバーブ（`distanceRolloff`）
+
+デフォルトでは、リバーブは全音源を混ぜた出力にかかるので、直接音とリバーブの比率はどの距離でも同じです。実際の空間では、直接音は距離とともに小さくなる一方、残響は同じくらいの大きさで残るため、遠い音ほど響きが多く聞こえます。これは距離を感じる大きな手がかりです。
+
+`distanceRolloff` を指定すると、各音源は `PannerNode` の手前で分けた専用の送りを通してリバーブに入ります。送る量は、その音源の `refDistance` を使った逆数モデルに従います。
+
+```
+送る量 = refDistance / (refDistance + distanceRolloff × (max(距離, refDistance) − refDistance))
+```
+
+`distanceRolloff` は PannerNode の `rolloffFactor`（デフォルト 1）より小さくすると、リバーブが直接音よりなだらかに小さくなります。`0` にすると、リバーブの大きさは距離に関係なく一定です。`rolloffFactor: 1`、`distanceRolloff: 0.2` の場合、直接音に対するリバーブの比率は、`refDistance` のときに比べて、5 倍の距離で約 9 dB、20 倍の距離で約 12 dB 大きくなります。
+
+> **注意:** 送りは PannerNode の手前で分けるので、リバーブには方向がなく、モノラルのままリバーブに入ります。そのため `refDistance` の位置では、同じ `wet` でもデフォルトのモード（左右に振り分けた後の音がリバーブに入る）より 2〜3 dB ほど大きくなります。
+
 #### 内部オーディオグラフ（リバーブ有効時）
 
 ```
 masterGain ─┬─ dryGain ─────────────── destination
              └─ reverbGain ─ convolver ─ destination
+```
+
+`distanceRolloff` を指定したとき:
+
+```
+各音源: … ─ 音量 ─┬─ PannerNode ─ masterGain ─ dryGain ─ destination
+                 └─ リバーブへの送り ─ reverbSendBus ─ reverbGain ─ convolver ─ destination
 ```
 
 ### `disableReverb(): void`

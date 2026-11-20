@@ -12,8 +12,14 @@ class MockAudioParam {
 }
 
 class MockAudioNode {
-  connect(_dest: unknown) { return _dest as MockAudioNode; }
-  disconnect() {}
+  /** Nodes this one is connected to, so tests can check the wiring. */
+  connections: unknown[] = [];
+  connect(dest: unknown) { this.connections.push(dest); return dest as MockAudioNode; }
+  disconnect() { this.connections = []; }
+}
+
+class MockConvolverNode extends MockAudioNode {
+  buffer: unknown = null;
 }
 
 class MockGainNode extends MockAudioNode {
@@ -46,6 +52,7 @@ class MockAudioBufferSourceNode extends MockAudioNode {
 class MockAudioContext {
   state = 'running';
   currentTime = 0;
+  sampleRate = 48000;
   destination = new MockAudioNode();
 
   listener = {
@@ -66,6 +73,13 @@ class MockAudioContext {
   createGain() { return new MockGainNode(); }
 
   createBufferSource() { return new MockAudioBufferSourceNode(); }
+
+  createConvolver() { return new MockConvolverNode(); }
+
+  createBuffer(channels: number, length: number) {
+    const data = Array.from({ length: channels }, () => new Float32Array(length));
+    return { numberOfChannels: channels, length, getChannelData: (ch: number) => data[ch] };
+  }
 
   decodeAudioData(_buf: ArrayBuffer) {
     return Promise.resolve({} as AudioBuffer);

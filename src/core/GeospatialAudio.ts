@@ -240,12 +240,20 @@ export class GeospatialAudio {
 
   // ── Reverb ───────────────────────────────────────────────────────────────
 
+  /**
+   * Enables or updates the reverb. With `distanceRolloff` set, each sound
+   * feeds the reverb by an amount that falls with distance more slowly than
+   * its direct sound, so far sounds come out wetter; otherwise the reverb is
+   * applied to the mix of all sounds at a fixed wet/dry ratio.
+   */
   setReverb(config: ReverbConfig): void {
     this.audioEngine.setReverb(config);
+    this.soundManager.updateReverbSends();
   }
 
   disableReverb(): void {
     this.audioEngine.disableReverb();
+    this.soundManager.updateReverbSends();
   }
 
   setMasterVolume(volume: number): void {

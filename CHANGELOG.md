@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Distance-based reverb** (`ReverbConfig.distanceRolloff`). By default the
+  reverb is applied to the mix of all sounds, so the reverb-to-direct ratio
+  is the same at any distance. With `distanceRolloff` set, each sound feeds
+  the reverb through its own send, taken before its `PannerNode`, at a level
+  that falls with distance by the inverse distance model with that rolloff.
+  Set lower than the panner's `rolloffFactor`, the reverb fades more slowly
+  than the direct sound, so far sounds come out wetter, as in real spaces.
+  Without `distanceRolloff` the reverb works as before.
+
 ## [0.5.0] - 2026-11-20
 
 ### Fixed

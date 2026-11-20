@@ -20,6 +20,12 @@ const DEFAULTS: Required<GeospatialAudioOptions> = {
 export class AudioEngine {
   private audioContext: AudioContext;
   private masterGain: GainNode;
+  /**
+   * Where each sound's reverb send goes (see SoundSource). Feeds the reverb
+   * only while distance-based reverb is on; its gain mirrors the master
+   * volume, since the sends bypass masterGain.
+   */
+  private reverbSendBus: GainNode;
   private options: Required<GeospatialAudioOptions>;
   /** Peak of currentTime − performance.now() (s) and when it was updated (ms); see contextTimeAt. */
   private clockOffset = -Infinity;
@@ -32,6 +38,8 @@ export class AudioEngine {
   private convolver: ConvolverNode | null = null;
   private reverbGain: GainNode | null = null;
   private dryGain: GainNode | null = null;
+  /** ReverbConfig.distanceRolloff while distance-based reverb is on, else null. */
+  private reverbDistanceRolloff: number | null = null;
 
   constructor(options?: GeospatialAudioOptions) {
     this.options = { ...DEFAULTS, ...options };
@@ -41,6 +49,7 @@ export class AudioEngine {
 
     this.masterGain = this.audioContext.createGain();
     this.masterGain.connect(this.audioContext.destination);
+    this.reverbSendBus = this.audioContext.createGain();
   }
 
   async ensureResumed(): Promise<void> {
@@ -131,9 +140,14 @@ export class AudioEngine {
   /**
    * Enables or updates the reverb effect.
    *
-   * Audio graph with reverb:
+   * Audio graph with reverb (the mix of all sounds feeds the reverb):
    *   masterGain ─┬─ dryGain ──────────────────── destination
    *               └─ reverbGain ── convolver ───── destination
+   *
+   * With `distanceRolloff` set, each sound feeds the reverb through its own
+   * send instead, before its PannerNode (see SoundSource.setPosition):
+   *   masterGain ── dryGain ───────────────────────────── destination
+   *   reverbSendBus ── reverbGain ── convolver ─────────── destination
    */
   setReverb(config: ReverbConfig): void {
     if (!config.enabled) {
@@ -147,15 +161,20 @@ export class AudioEngine {
       this.reverbGain = this.audioContext.createGain();
       this.dryGain    = this.audioContext.createGain();
 
-      // Rewire: masterGain → dryGain → destination
-      this.masterGain.disconnect();
-      this.masterGain.connect(this.dryGain);
       this.dryGain.connect(this.audioContext.destination);
-
-      // Wet path: masterGain → reverbGain → convolver → destination
-      this.masterGain.connect(this.reverbGain);
       this.reverbGain.connect(this.convolver);
       this.convolver.connect(this.audioContext.destination);
+    }
+
+    // (Re)wire the reverb's input for the chosen mode.
+    this.reverbDistanceRolloff = config.distanceRolloff ?? null;
+    this.masterGain.disconnect();
+    this.reverbSendBus.disconnect();
+    this.masterGain.connect(this.dryGain!);
+    if (this.reverbDistanceRolloff === null) {
+      this.masterGain.connect(this.reverbGain!);
+    } else {
+      this.reverbSendBus.connect(this.reverbGain!);
     }
 
     this.convolver.buffer = config.customIR ?? this.generateIR(config);
@@ -167,6 +186,7 @@ export class AudioEngine {
     if (!this.convolver) return;
 
     this.masterGain.disconnect();
+    this.reverbSendBus.disconnect();
     this.convolver.disconnect();
     this.reverbGain!.disconnect();
     this.dryGain!.disconnect();
@@ -176,14 +196,26 @@ export class AudioEngine {
     this.convolver  = null;
     this.reverbGain = null;
     this.dryGain    = null;
+    this.reverbDistanceRolloff = null;
+  }
+
+  /** ReverbConfig.distanceRolloff while distance-based reverb is on, else null. */
+  getReverbDistanceRolloff(): number | null {
+    return this.reverbDistanceRolloff;
   }
 
   setMasterVolume(volume: number): void {
-    this.masterGain.gain.value = Math.max(0, Math.min(1, volume));
+    const v = Math.max(0, Math.min(1, volume));
+    this.masterGain.gain.value = v;
+    this.reverbSendBus.gain.value = v;
   }
 
   getMasterGain(): GainNode {
     return this.masterGain;
+  }
+
+  getReverbSendBus(): GainNode {
+    return this.reverbSendBus;
   }
 
   getContext(): AudioContext {

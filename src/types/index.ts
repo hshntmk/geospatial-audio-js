@@ -108,6 +108,19 @@ export interface ReverbConfig {
   dry?: number;
   /** Custom impulse response buffer (used when type is omitted). */
   customIR?: AudioBuffer;
+  /**
+   * Makes the reverb depend on distance. When set, each sound feeds the
+   * reverb by its own amount, `refDistance / (refDistance + distanceRolloff ·
+   * (distance − refDistance))` (the inverse distance model, with the sound's
+   * own `refDistance`), taken before its PannerNode. Set it lower than the
+   * PannerNode's `rolloffFactor` so the reverb fades more slowly than the
+   * direct sound, and far sounds come out wetter, as in real spaces.
+   * 0 keeps the reverb level the same at any distance.
+   *
+   * When omitted (default), the reverb is applied to the mix of all sounds
+   * at a fixed wet/dry ratio, as before.
+   */
+  distanceRolloff?: number;
 }
 
 // ---- Doppler ----

@@ -93,6 +93,11 @@ export class SoundManager {
     });
   }
 
+  /** Re-computes every sound's reverb send (called when the reverb settings change). */
+  updateReverbSends(): void {
+    this.sounds.forEach(sound => sound.updateReverbSend());
+  }
+
   setDebugHelper(debugHelper: DebugHelper): void {
     this.debugHelper = debugHelper;
   }

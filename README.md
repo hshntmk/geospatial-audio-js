@@ -91,7 +91,7 @@ All methods and options, including playback control, events and debug info, are 
 ## Limitations
 
 - Longitude/latitude is converted to audio-space coordinates (meters) with an equirectangular approximation. Direction and distance errors grow the farther a sound is from the listener.
-- Reverb is applied to the combined output of all sounds. Sounds cannot have different reverbs.
+- There is one reverb, shared by all sounds. By default it is applied to their combined output, so the amount of reverb does not change with distance. Pass `distanceRolloff` to `setReverb()` to make far sounds wetter.
 - The Doppler effect, propagation delay and air absorption are computed from the distance to each sound, sampled every 100 ms (configurable with `updateInterval`).
 - Propagation delay is capped at 5 seconds (about 1.7 km at 343.3 m/s). `maxDelayTime` changes the cap, but only for sounds added after the change.
 - There are no adapters for Google Maps or OpenLayers. Other map libraries can be used by implementing the `MapAdapter` interface.
