@@ -157,9 +157,9 @@ export interface PropagationDelayConfig {
    */
   maxDelayTime?: number;
   /**
-   * Time constant (seconds) for AudioParam.setTargetAtTime smoothing, applied
-   * while the distance changes continuously (e.g. panning the map or a
-   * moving sound). Larger = smoother but laggier. Default: 0.1
+   * @deprecated Ignored. The delay now moves in linear ramps as long as
+   * `updateInterval`: an exponential (setTargetAtTime) approach made the
+   * pitch warble at the update rate.
    */
   smoothing?: number;
   /**

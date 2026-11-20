@@ -356,7 +356,7 @@ interface PropagationDelayConfig {
   speedOfSound?:   number;  // m/s, default: 343.3
   updateInterval?: number;  // distance sampling interval (ms), default: 100
   maxDelayTime?:   number;  // delay cap (s) = DelayNode capacity, default: 5
-  smoothing?:      number;  // setTargetAtTime time constant (s), default: 0.1
+  smoothing?:      number;  // deprecated, ignored (see below)
   jumpThreshold?:  number;  // distance jump (m) that triggers a snap, default: 500
 }
 ```
@@ -365,12 +365,14 @@ interface PropagationDelayConfig {
 
 | distance change | behaviour |
 |---|---|
-| ≤ `jumpThreshold` | Continuous motion (panning the map, a moving sound) — the delay is **ramped** smoothly via `AudioParam.setTargetAtTime`. |
+| ≤ `jumpThreshold` | Continuous motion (panning the map, a moving sound). The delay is **ramped** linearly to the new value over one `updateInterval`, scheduled 0.1 s ahead and chained onto the previous ramp. |
 | > `jumpThreshold` | A discontinuity (`flyTo`/`setView`, a sound teleported via `updateSoundPosition`) — the delay **snaps** instantly instead of sweeping audibly across the jump. |
 
 > **Note:** `maxDelayTime` sets a `DelayNode`'s fixed capacity at creation time, so raising it only affects sounds added *after* the change — existing sounds keep whatever capacity they were created with. Sounds farther than `maxDelayTime * speedOfSound` have their delay clamped rather than growing further; raise `maxDelayTime` for large scenes, at the cost of a larger delay buffer per sound.
 >
-> This is independent of `setDopplerEffect` — both can be enabled together, since one delays arrival time and the other shifts pitch. Combining them approximates real propagation more closely than either alone.
+> A delay that changes over time also shifts the pitch, by a factor of `1 − (rate of change of the delay)`. This is the same shift a Doppler effect gives, so a moving sound changes pitch with propagation delay alone. The linear ramp keeps that shift steady; the earlier `setTargetAtTime` ramp made it warble at the update rate, which is why `smoothing` is no longer used.
+>
+> When `setDopplerEffect` is enabled as well, it divides the delay's own shift out of its `playbackRate`, so the pitch heard is the one its settings describe (`dopplerFactor`, `listenerMotion`) rather than the two shifts multiplied.
 
 ---
 

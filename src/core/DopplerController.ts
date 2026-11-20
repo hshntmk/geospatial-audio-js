@@ -2,6 +2,7 @@ import type { DopplerConfig, Position } from '../types/index.js';
 import type { SoundManager } from './SoundManager.js';
 import type { ListenerManager } from './ListenerManager.js';
 import type { CoordinateConverter } from '../utils/CoordinateConverter.js';
+import type { PropagationDelayController } from './PropagationDelayController.js';
 import { logger } from '../utils/Logger.js';
 
 const DEFAULTS: Required<Omit<DopplerConfig, 'enabled'>> = {
@@ -36,11 +37,17 @@ interface Sample {
  * means it is approaching (higher pitch). Velocity is derived automatically
  * from successive positions, so moving sounds (updateSoundPosition) and map
  * movement (listener) are both reflected with no extra bookkeeping by callers.
+ *
+ * When propagation delay is also enabled, its changing DelayNode already
+ * shifts the pitch by its own factor (PropagationDelayController
+ * .getRateFactor). That factor is divided out of playbackRate here, so the
+ * pitch heard is `ratio` above rather than the two shifts multiplied.
  */
 export class DopplerController {
   private soundManager: SoundManager;
   private listenerManager: ListenerManager;
   private coordinateConverter: CoordinateConverter;
+  private propagationDelay?: Pick<PropagationDelayController, 'getRateFactor'>;
 
   private config: Required<DopplerConfig> = { enabled: false, ...DEFAULTS };
   private intervalId: ReturnType<typeof setInterval> | null = null;
@@ -52,10 +59,12 @@ export class DopplerController {
     soundManager: SoundManager,
     listenerManager: ListenerManager,
     coordinateConverter: CoordinateConverter,
+    propagationDelay?: Pick<PropagationDelayController, 'getRateFactor'>,
   ) {
     this.soundManager = soundManager;
     this.listenerManager = listenerManager;
     this.coordinateConverter = coordinateConverter;
+    this.propagationDelay = propagationDelay;
   }
 
   setConfig(config: DopplerConfig): void {
@@ -98,7 +107,6 @@ export class DopplerController {
   private update(): void {
     const listenerPos = this.listenerManager.getCurrentPosition();
     const { speedOfSound: c, dopplerFactor, maxPitchRatio, smoothing } = this.config;
-    const now = performance.now() / 1000; // seconds
     const minRatio = 1 / maxPitchRatio;
 
     const seen = new Set<string>();
@@ -115,15 +123,23 @@ export class DopplerController {
       seen.add(sound.id);
       const geo = sound.geoPosition;
       const distance = this.coordinateConverter.calculateDistance(listenerPos, geo);
+      // Time the sample by when the positions were last set, not by this
+      // timer: positions arrive once per rendered frame, so timing by the
+      // timer adds up to a frame's worth of error to every velocity estimate.
+      const time = Math.max(sound.geoPositionTime, this.listenerManager.getPositionTime()) / 1000;
       const prev = this.samples.get(sound.id);
       // Snapshot the geo so an in-place mutation of the source can't corrupt the
       // previous sample we rely on for the next tick.
-      this.samples.set(sound.id, { distance, geo: { ...geo }, time: now });
+      this.samples.set(sound.id, { distance, geo: { ...geo }, time });
 
       // Need two samples to estimate dr/dt; first tick just primes the buffer.
       if (!prev) continue;
-      const dt = now - prev.time;
-      if (dt <= 0) continue;
+      const dt = time - prev.time;
+      // Neither the sound nor the listener has moved since the last sample.
+      if (dt <= 0) {
+        if (sound.getPlaybackRate() !== 1) sound.setPlaybackRate(1, smoothing);
+        continue;
+      }
 
       // m/s, +ve = receding.
       // listenerMotion: total distance change (source + listener motion).
@@ -133,6 +149,9 @@ export class DopplerController {
         : this.sourceRadialVelocity(listenerPos, prev.geo, geo, dt);
 
       let ratio = c / (c + dopplerFactor * radialVelocity);
+      // The delay line follows the total distance change regardless of
+      // listenerMotion, so its factor is computed from that.
+      ratio /= this.propagationDelay?.getRateFactor(prev.distance, distance, dt) ?? 1;
       ratio = Math.max(minRatio, Math.min(maxPitchRatio, ratio));
 
       sound.setPlaybackRate(ratio, smoothing);

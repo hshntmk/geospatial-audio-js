@@ -1,5 +1,10 @@
 import type { GeospatialAudioOptions, SoundPannerOptions, Vector3, ReverbConfig } from '../types/index.js';
 
+/** How fast (s per s) the tracked clock offset may sink, to follow drift between the clocks. */
+const CLOCK_DRIFT = 0.001;
+/** A drop in the clock offset larger than this (s) means the context was suspended: start over. */
+const CLOCK_RESET = 0.05;
+
 const DEFAULTS: Required<GeospatialAudioOptions> = {
   distanceModel: 'inverse',
   refDistance: 5,
@@ -16,6 +21,10 @@ export class AudioEngine {
   private audioContext: AudioContext;
   private masterGain: GainNode;
   private options: Required<GeospatialAudioOptions>;
+  /** Peak of currentTime − performance.now() (s) and when it was updated (ms); see contextTimeAt. */
+  private clockOffset = -Infinity;
+  private clockOffsetAt = 0;
+
   /** Capacity (seconds) for DelayNodes created by createDelayNode(). Fixed per-node at creation. */
   private propagationDelayMax = 5;
 
@@ -179,6 +188,29 @@ export class AudioEngine {
 
   getContext(): AudioContext {
     return this.audioContext;
+  }
+
+  /**
+   * Converts a performance.now() timestamp (ms) to AudioContext time, on the
+   * same timeline as currentTime.
+   *
+   * currentTime only advances once per audio callback (several ms), too
+   * coarse to time a delay ramp whose slope sets the pitch. So the offset
+   * between the two clocks is measured on every call: it saw-tooths, peaking
+   * right after currentTime steps, and that peak is the true offset. The
+   * peak is tracked, sinking slowly to follow drift between the clocks, and
+   * reset when the offset drops sharply (the context was suspended).
+   *
+   * getOutputTimestamp() is not used: it gives the time being heard, which
+   * trails currentTime by the output latency (over 150 ms on Bluetooth).
+   */
+  contextTimeAt(performanceTime: number): number {
+    const nowMs = performance.now();
+    const offset = this.audioContext.currentTime - nowMs / 1000;
+    const sunk = this.clockOffset - (CLOCK_DRIFT * (nowMs - this.clockOffsetAt)) / 1000;
+    this.clockOffset = offset < this.clockOffset - CLOCK_RESET ? offset : Math.max(offset, sunk);
+    this.clockOffsetAt = nowMs;
+    return performanceTime / 1000 + this.clockOffset;
   }
 
   dispose(): void {

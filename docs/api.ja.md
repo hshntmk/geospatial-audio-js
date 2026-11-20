@@ -357,7 +357,7 @@ interface PropagationDelayConfig {
   speedOfSound?:   number;  // m/s、デフォルト: 343.3
   updateInterval?: number;  // 距離のサンプリング間隔(ms)、デフォルト: 100
   maxDelayTime?:   number;  // 遅延の上限(秒) = DelayNode の容量、デフォルト: 5
-  smoothing?:      number;  // setTargetAtTime の時定数(秒)、デフォルト: 0.1
+  smoothing?:      number;  // 非推奨。指定しても使われない(下記参照)
   jumpThreshold?:  number;  // スナップ（瞬時反映）を発動する距離の変化量(m)、デフォルト: 500
 }
 ```
@@ -366,12 +366,14 @@ interface PropagationDelayConfig {
 
 | 距離の変化量 | 挙動 |
 |---|---|
-| `jumpThreshold` 以下 | 連続的な移動（地図のパン、音源の移動）— `AudioParam.setTargetAtTime` により**なめらかにランプ**します。 |
+| `jumpThreshold` 以下 | 連続的な移動（地図のパン、音源の移動）。`updateInterval` 1 回分の時間をかけて、新しい値まで遅延を**直線的にランプ**します。ランプは 0.1 秒先から予約し、前のランプの終わりにつなげます。 |
 | `jumpThreshold` を超える | 不連続な変化（`flyTo`／`setView`、`updateSoundPosition` による音源のテレポート）— 遅延を**瞬時にスナップ**し、ジャンプをまたいで不自然に音が伸び縮みするのを防ぎます。 |
 
 > **注意:** `maxDelayTime` は `DelayNode` 生成時に固定される容量を決めるため、値を大きくしても効果があるのは**変更後に追加した音源のみ**です。既存の音源は生成時点の容量のまま残ります。`maxDelayTime * speedOfSound` より遠い音源は、遅延がそれ以上伸びずに上限でクランプされます。広いシーンでは `maxDelayTime` を大きくしてください（音源ごとの遅延バッファが大きくなる分、メモリ消費は増えます）。
 >
-> `setDopplerEffect` とは独立しており、両方同時に有効化できます。片方は到達時刻を遅らせ、もう片方はピッチを変化させるため、組み合わせることでどちらか単体よりも実際の音の伝搬に近い表現になります。
+> 遅延が時間とともに変わると、`1 −（遅延の変化速度）`倍のピッチ変化も起きます。これはドップラー効果と同じ変化なので、伝搬遅延だけを有効にしても、動く音源のピッチは変わります。直線的なランプはこの変化を一定に保ちます。以前の `setTargetAtTime` によるランプでは、ピッチが更新間隔ごとに揺れていました。`smoothing` を使わなくなったのはこのためです。
+>
+> `setDopplerEffect` も有効にした場合、遅延によるピッチ変化はドップラー側の `playbackRate` で割り戻されます。そのため、聞こえるピッチは 2 つの変化を掛け合わせたものではなく、ドップラー効果の設定（`dopplerFactor`、`listenerMotion`）どおりになります。
 
 ---
 

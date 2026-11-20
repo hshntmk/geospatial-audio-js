@@ -78,6 +78,8 @@ audio.setPropagationDelay({ enabled: true });  // delays each sound by distance 
 audio.setAirAbsorption({ enabled: true });     // cuts more high frequencies the farther a sound is (lowpass filter)
 ```
 
+A changing delay shifts pitch by itself, so with propagation delay alone a moving sound already gets the same pitch shift as the Doppler effect. When the Doppler effect is enabled as well, the pitch follows the `setDopplerEffect()` settings instead of the two shifts stacking.
+
 Distance culling starts with `initialize()`. By default, sounds farther than 5000 m are paused and resumed when they come back in range, and at most 10 sounds play at once, nearest to the listener first.
 
 ```ts

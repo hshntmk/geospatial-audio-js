@@ -32,7 +32,14 @@ function makeSource(started: { offset: number }): AudioBufferSourceNode {
 
 function makeDelayNode(): DelayNode {
   return {
-    delayTime: { value: 0, maxValue: 5, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
+    delayTime: {
+      value: 0,
+      maxValue: 5,
+      setTargetAtTime: vi.fn(),
+      cancelScheduledValues: vi.fn(),
+      setValueAtTime: vi.fn(),
+      linearRampToValueAtTime: vi.fn(),
+    },
     connect: vi.fn(),
     disconnect: vi.fn(),
   } as unknown as DelayNode;
@@ -194,6 +201,7 @@ describe('SoundSource', () => {
       const gain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() } as unknown as GainNode;
       return {
         getContext: () => ({ currentTime, createBufferSource: () => makeSource({ offset: 0 }) }),
+        contextTimeAt: () => currentTime,
         createPannerNode: () => panner,
         createDelayNode: () => delayNode,
         createFilterNode: () => makeFilterNode(),
@@ -202,7 +210,7 @@ describe('SoundSource', () => {
       } as unknown as AudioEngine;
     }
 
-    it('sets delayTime directly when smoothing is 0 (snap)', () => {
+    it('sets delayTime directly when rampTime is 0 (snap)', () => {
       const delayNode = makeDelayNode();
       const sound = new SoundSource('s', makeAudioBuffer(5), makeEngine(0, delayNode), makeConfig());
 
@@ -210,17 +218,83 @@ describe('SoundSource', () => {
 
       expect(delayNode.delayTime.value).toBe(1.5);
       expect(delayNode.delayTime.cancelScheduledValues).toHaveBeenCalled();
-      expect(delayNode.delayTime.setTargetAtTime).not.toHaveBeenCalled();
+      expect(delayNode.delayTime.linearRampToValueAtTime).not.toHaveBeenCalled();
       expect(sound.getPropagationDelay()).toBe(1.5);
     });
 
-    it('ramps via setTargetAtTime when smoothing > 0', () => {
-      const delayNode = makeDelayNode();
-      const sound = new SoundSource('s', makeAudioBuffer(5), makeEngine(2, delayNode), makeConfig());
+    describe('ramping (rampTime > 0)', () => {
+      // Ramps start DELAY_LOOKAHEAD (0.1 s) ahead of currentTime and chain end
+      // to end, so audio the audio thread has already rendered is never rewritten.
+      function setup() {
+        const delayNode = makeDelayNode();
+        const ctx = { currentTime: 2, createBufferSource: () => makeSource({ offset: 0 }) };
+        const engine = {
+          ...makeEngine(0, delayNode),
+          getContext: () => ctx,
+          // Map performance.now() ms straight to context seconds for the test.
+          contextTimeAt: (ms: number) => ms / 1000,
+        } as unknown as AudioEngine;
+        const sound = new SoundSource('s', makeAudioBuffer(5), engine, makeConfig());
+        sound.setPropagationDelay(0.5); // snap at t = 2
+        vi.mocked(delayNode.delayTime.cancelScheduledValues).mockClear();
+        return { delayNode, ctx, sound };
+      }
 
-      sound.setPropagationDelay(0.8, 0.1);
+      it('holds the current value until the lookahead, then ramps linearly', () => {
+        const { delayNode, sound } = setup();
 
-      expect(delayNode.delayTime.setTargetAtTime).toHaveBeenCalledWith(0.8, 2, 0.1);
+        sound.setPropagationDelay(0.52, 0.1, 2000);
+
+        expect(delayNode.delayTime.setValueAtTime).toHaveBeenCalledWith(0.5, expect.closeTo(2.1, 10));
+        expect(delayNode.delayTime.linearRampToValueAtTime).toHaveBeenCalledWith(0.52, expect.closeTo(2.2, 10));
+        // An exponential approach would make the pitch warble (see setPropagationDelay).
+        expect(delayNode.delayTime.setTargetAtTime).not.toHaveBeenCalled();
+      });
+
+      it('chains the next ramp onto the end of the previous one without cancelling it', () => {
+        const { delayNode, ctx, sound } = setup();
+        sound.setPropagationDelay(0.52, 0.1, 2000);
+        vi.mocked(delayNode.delayTime.setValueAtTime).mockClear();
+
+        ctx.currentTime = 2.1; // next update, on time
+        sound.setPropagationDelay(0.54, 0.1, 2100);
+
+        expect(delayNode.delayTime.cancelScheduledValues).not.toHaveBeenCalled();
+        expect(delayNode.delayTime.setValueAtTime).not.toHaveBeenCalled();
+        expect(delayNode.delayTime.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.54, expect.closeTo(2.3, 10));
+      });
+
+      it('holds the last ramp\'s end value when an update arrives after that ramp finished', () => {
+        const { delayNode, ctx, sound } = setup();
+        sound.setPropagationDelay(0.52, 0.1, 2000); // ends at 2.2
+
+        ctx.currentTime = 2.5; // a late update
+        sound.setPropagationDelay(0.56, 0.1, 2500);
+
+        expect(delayNode.delayTime.setValueAtTime).toHaveBeenLastCalledWith(0.52, expect.closeTo(2.6, 10));
+        expect(delayNode.delayTime.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.56, expect.closeTo(2.7, 10));
+      });
+
+      it('times the ramp by when the positions were set, not by when the update ran', () => {
+        const { delayNode, ctx, sound } = setup();
+        sound.setPropagationDelay(0.52, 0.1, 2000);
+
+        // The update runs at 2.11 s, but the positions it read were set at 2.09 s.
+        ctx.currentTime = 2.11;
+        sound.setPropagationDelay(0.54, 0.1, 2090);
+
+        expect(delayNode.delayTime.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.54, expect.closeTo(2.29, 10));
+      });
+
+      it('schedules nothing when the positions have not changed since the last ramp', () => {
+        const { delayNode, ctx, sound } = setup();
+        sound.setPropagationDelay(0.52, 0.1, 2000);
+
+        ctx.currentTime = 2.1;
+        sound.setPropagationDelay(0.52, 0.1, 2000); // same positions, same time
+
+        expect(delayNode.delayTime.linearRampToValueAtTime).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('clamps to the node capacity (maxValue) and rejects negative values', () => {

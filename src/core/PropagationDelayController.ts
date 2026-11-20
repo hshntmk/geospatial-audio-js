@@ -4,11 +4,12 @@ import type { ListenerManager } from './ListenerManager.js';
 import type { CoordinateConverter } from '../utils/CoordinateConverter.js';
 import { logger } from '../utils/Logger.js';
 
-const DEFAULTS: Required<Omit<PropagationDelayConfig, 'enabled'>> = {
+type Config = Required<Omit<PropagationDelayConfig, 'smoothing'>>;
+
+const DEFAULTS: Omit<Config, 'enabled'> = {
   speedOfSound: 343.3,
   updateInterval: 100,
   maxDelayTime: 5,
-  smoothing: 0.1,
   jumpThreshold: 500,
 };
 
@@ -24,8 +25,9 @@ interface Sample {
  * AudioEngine.createDelayNode / SoundSource.setPropagationDelay).
  *
  * During continuous motion (panning the map, or a moving sound) the delay is
- * ramped smoothly via AudioParam.setTargetAtTime, tracking the small,
- * frame-to-frame distance changes without artifacts. A distance change
+ * ramped linearly between samples. A delay that changes over time also
+ * shifts the pitch, exactly like a Doppler effect (see getRateFactor), and a
+ * linear ramp keeps that shift steady. A distance change
  * larger than `jumpThreshold` in a single update — a map flyTo/setView, or a
  * sound teleported via updateSoundPosition — is treated as a discontinuity
  * and the delay is snapped instantly instead, avoiding an audible sweep
@@ -40,7 +42,7 @@ export class PropagationDelayController {
   private listenerManager: ListenerManager;
   private coordinateConverter: CoordinateConverter;
 
-  private config: Required<PropagationDelayConfig> = { enabled: false, ...DEFAULTS };
+  private config: Config = { enabled: false, ...DEFAULTS };
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
   private samples = new Map<string, Sample>();
@@ -85,6 +87,27 @@ export class PropagationDelayController {
     this.samples.clear();
   }
 
+  /**
+   * The playback-rate factor the DelayNode itself applies while the distance
+   * to a sound changes from `prevDistance` to `distance` over `dt` seconds.
+   * Reading a delay line whose delay grows by Δd over dt plays the audio
+   * (1 − Δd/dt)× as fast — the same pitch shift a Doppler effect gives — so
+   * DopplerController divides this out to avoid shifting the pitch twice.
+   * Returns 1 when the delay is disabled or the change is a jump (snapped,
+   * so no shift).
+   */
+  getRateFactor(prevDistance: number, distance: number, dt: number): number {
+    const { enabled, speedOfSound, maxDelayTime, jumpThreshold } = this.config;
+    if (!enabled || dt <= 0) return 1;
+    if (Math.abs(distance - prevDistance) > jumpThreshold) return 1;
+
+    const prevDelay = Math.min(prevDistance / speedOfSound, maxDelayTime);
+    const delay = Math.min(distance / speedOfSound, maxDelayTime);
+    // A source receding faster than sound would need a negative rate; keep
+    // the factor positive and let the caller's pitch clamp handle it.
+    return Math.max(1e-3, 1 - (delay - prevDelay) / dt);
+  }
+
   // ── Private ────────────────────────────────────────────────────────────────
 
   private restart(): void {
@@ -94,7 +117,10 @@ export class PropagationDelayController {
 
   private update(): void {
     const listenerPos = this.listenerManager.getCurrentPosition();
-    const { speedOfSound, maxDelayTime, smoothing, jumpThreshold } = this.config;
+    const { speedOfSound, maxDelayTime, updateInterval, jumpThreshold } = this.config;
+    // One ramp per update, each as long as the update interval, chained end
+    // to end (see SoundSource.setPropagationDelay).
+    const rampTime = updateInterval / 1000;
 
     const seen = new Set<string>();
 
@@ -113,6 +139,8 @@ export class PropagationDelayController {
 
       seen.add(sound.id);
       const distance = this.coordinateConverter.calculateDistance(listenerPos, sound.geoPosition);
+      // When the positions behind `distance` were last set (see SoundSource.setPropagationDelay).
+      const sampledAt = Math.max(sound.geoPositionTime, this.listenerManager.getPositionTime());
       const delayTime = Math.min(distance / speedOfSound, maxDelayTime);
 
       const prev = this.samples.get(sound.id);
@@ -123,7 +151,7 @@ export class PropagationDelayController {
       if (!prev || Math.abs(distance - prev.distance) > jumpThreshold) {
         sound.setPropagationDelay(delayTime);
       } else {
-        sound.setPropagationDelay(delayTime, smoothing);
+        sound.setPropagationDelay(delayTime, rampTime, sampledAt);
       }
     }
 

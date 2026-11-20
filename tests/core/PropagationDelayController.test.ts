@@ -9,13 +9,17 @@ import type { SoundState } from '../../src/types/index.js';
 /** Minimal SoundSource stand-in. Distance is taken from geoPosition.lng. */
 function makeSound(id: string, distance: number, state: SoundState = 'playing') {
   let delay = 0;
+  let rampTime = 0;
   return {
     id,
     state,
     geoPosition: { lng: distance, lat: 0, alt: 0 },
+    geoPositionTime: 0,
     getPropagationDelay: () => delay,
-    setPropagationDelay: (d: number) => { delay = d; },
-  } as unknown as SoundSource;
+    setPropagationDelay: (d: number, ramp = 0) => { delay = d; rampTime = ramp; },
+    /** Ramp time passed with the last setPropagationDelay call (0 = snap). */
+    lastRampTime: () => rampTime,
+  } as unknown as SoundSource & { lastRampTime(): number };
 }
 
 const C = 343.3;
@@ -37,6 +41,7 @@ describe('PropagationDelayController', () => {
     const soundManager = { getAllSounds: () => sounds } as unknown as SoundManager;
     const listenerManager = {
       getCurrentPosition: () => listenerPos,
+      getPositionTime: () => 0,
     } as unknown as ListenerManager;
     const converter = {
       // distance encoded as geoPosition.lng relative to listener at lng 0
@@ -68,17 +73,19 @@ describe('PropagationDelayController', () => {
     expect(s.getPropagationDelay()).toBe(2);
   });
 
-  it('ramps (smoothing > 0) for a small, continuous distance change', () => {
+  it('ramps over one update interval for a small, continuous distance change', () => {
+    controller.setConfig({ enabled: true, updateInterval: 100 });
+    controller.stop(); // drive ticks by hand
     const s = makeSound('a', 1000);
     sounds.push(s);
     update(); // prime — snapped since it's the first sample
     expect(s.getPropagationDelay()).toBeCloseTo(1000 / C, 5);
+    expect(s.lastRampTime()).toBe(0);
 
     s.geoPosition.lng = 1010; // +10 m, well under the 500 m jump threshold
-    // setPropagationDelay is a stand-in that ignores the smoothing arg but we
-    // can still assert the *value* passed is the new, ramped-toward target.
     update();
     expect(s.getPropagationDelay()).toBeCloseTo(1010 / C, 5);
+    expect(s.lastRampTime()).toBeCloseTo(0.1, 10);
   });
 
   it('snaps instantly on a distance jump larger than jumpThreshold', () => {
@@ -89,6 +96,30 @@ describe('PropagationDelayController', () => {
     s.geoPosition.lng = 5000; // +4000 m jump (map flyTo/setView-style)
     update();
     expect(s.getPropagationDelay()).toBeCloseTo(5000 / C, 5);
+    expect(s.lastRampTime()).toBe(0);
+  });
+
+  describe('getRateFactor', () => {
+    it('is 1 − (change in delay) / dt for continuous motion', () => {
+      // Receding at C / 10 m/s: the delay grows 0.1 s per second.
+      expect(controller.getRateFactor(1000, 1000 + C / 10, 1)).toBeCloseTo(0.9, 10);
+      // Approaching at the same speed.
+      expect(controller.getRateFactor(1000, 1000 - C / 10, 1)).toBeCloseTo(1.1, 10);
+    });
+
+    it('is 1 across a jump, which is snapped rather than ramped', () => {
+      expect(controller.getRateFactor(1000, 5000, 0.1)).toBe(1);
+    });
+
+    it('is 1 once the delay is pinned at maxDelayTime', () => {
+      controller.setConfig({ enabled: true, updateInterval: 1_000_000, maxDelayTime: 1 });
+      expect(controller.getRateFactor(2 * C, 2 * C + 100, 1)).toBe(1);
+    });
+
+    it('is 1 when propagation delay is disabled', () => {
+      controller.setConfig({ enabled: false });
+      expect(controller.getRateFactor(1000, 1100, 1)).toBe(1);
+    });
   });
 
   it('leaves a sound\'s delay untouched when it stops playing (does not truncate the draining tail)', () => {

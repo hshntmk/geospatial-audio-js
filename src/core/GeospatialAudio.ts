@@ -85,15 +85,17 @@ export class GeospatialAudio {
       this.coordinateConverter,
       this.eventEmitter,
     );
-    this.dopplerController = new DopplerController(
-      this.soundManager,
-      this.listenerManager,
-      this.coordinateConverter,
-    );
     this.propagationDelayController = new PropagationDelayController(
       this.soundManager,
       this.listenerManager,
       this.coordinateConverter,
+    );
+    // Doppler divides out the pitch shift the propagation delay already makes.
+    this.dopplerController = new DopplerController(
+      this.soundManager,
+      this.listenerManager,
+      this.coordinateConverter,
+      this.propagationDelayController,
     );
     this.airAbsorptionController = new AirAbsorptionController(
       this.soundManager,

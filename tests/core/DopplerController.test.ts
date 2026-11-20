@@ -13,6 +13,8 @@ function makeSound(id: string, distance: number, state: SoundState = 'playing') 
     id,
     state,
     geoPosition: { lng: distance, lat: 0, alt: 0 },
+    // Treat every sample as a fresh position, timed by the mocked clock.
+    get geoPositionTime() { return performance.now(); },
     getPlaybackRate: () => rate,
     setPlaybackRate: (r: number) => { rate = r; },
   } as unknown as SoundSource & { setRateSpy?: unknown };
@@ -40,6 +42,7 @@ describe('DopplerController', () => {
     const soundManager = { getAllSounds: () => sounds } as unknown as SoundManager;
     const listenerManager = {
       getCurrentPosition: () => listenerPos,
+      getPositionTime: () => 0,
     } as unknown as ListenerManager;
     const converter = {
       // distance encoded as geoPosition.lng relative to listener at lng 0
@@ -108,6 +111,19 @@ describe('DopplerController', () => {
     expect(s.getPlaybackRate()).toBeCloseTo(C / (C + 2 * 100), 5);
   });
 
+  it('returns to neutral pitch when neither the sound nor the listener has moved since the last sample', () => {
+    const s = makeSound('a', 100);
+    sounds.push(s);
+    update();
+    now = 1000;
+    s.geoPosition.lng = 200;
+    update();
+    expect(s.getPlaybackRate()).toBeLessThan(1);
+
+    update(); // clock (and so the position timestamps) unchanged
+    expect(s.getPlaybackRate()).toBe(1);
+  });
+
   it('resets a sound to neutral pitch when it stops playing', () => {
     const s = makeSound('a', 100);
     sounds.push(s);
@@ -160,6 +176,48 @@ describe('DopplerController', () => {
       listenerPos.lng = -150; // listener moves away → distance 100 → 250 (receding)
       update();
       expect(s.getPlaybackRate()).toBeLessThan(1);
+    });
+  });
+
+  describe('with propagation delay enabled', () => {
+    // The changing DelayNode already shifts pitch by its rate factor, so the
+    // playbackRate must divide it out to keep the heard pitch at C / (C + v).
+    function withDelayFactor(factor: (prev: number, dist: number, dt: number) => number) {
+      controller.dispose();
+      const soundManager = { getAllSounds: () => sounds } as unknown as SoundManager;
+      const listenerManager = { getCurrentPosition: () => listenerPos, getPositionTime: () => 0 } as unknown as ListenerManager;
+      const converter = {
+        calculateDistance: (a: { lng: number }, b: { lng: number }) => Math.abs(b.lng - a.lng),
+      } as unknown as CoordinateConverter;
+      controller = new DopplerController(soundManager, listenerManager, converter, { getRateFactor: factor });
+      controller.setConfig({ enabled: true, updateInterval: 1_000_000, smoothing: 0 });
+    }
+
+    it('divides the delay line\'s own pitch shift out of playbackRate', () => {
+      const delayFactor = vi.fn(() => 0.8);
+      withDelayFactor(delayFactor);
+      const s = makeSound('a', 100);
+      sounds.push(s);
+      update();
+      now = 1000;
+      s.geoPosition.lng = 200; // +100 m/s
+      update();
+      expect(delayFactor).toHaveBeenCalledWith(100, 200, 1);
+      // heard pitch = playbackRate × delay factor = C / (C + 100)
+      expect(s.getPlaybackRate() * 0.8).toBeCloseTo(C / (C + 100), 5);
+    });
+
+    it('cancels the delay line\'s shift when only the listener moves and listenerMotion is false', () => {
+      withDelayFactor((prev, dist, dt) => 1 - (dist - prev) / C / dt);
+      controller.setConfig({ enabled: true, updateInterval: 1_000_000, smoothing: 0, listenerMotion: false });
+      const s = makeSound('a', 100);
+      sounds.push(s);
+      update();
+      now = 1000;
+      listenerPos.lng = -50; // listener moves away: 100 → 150 m
+      update();
+      const heard = s.getPlaybackRate() * (1 - 50 / C);
+      expect(heard).toBeCloseTo(1, 5);
     });
   });
 

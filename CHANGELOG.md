@@ -4,6 +4,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Doppler effect and propagation delay no longer shift pitch twice.** A
+  `DelayNode` whose delay changes over time already shifts the pitch, the
+  same way a Doppler effect does. With both `setDopplerEffect()` and
+  `setPropagationDelay()` enabled, that shift was multiplied by the Doppler
+  `playbackRate`, roughly doubling it (about +190 cents instead of +96 for a
+  source passing at 20 m/s). The Doppler effect now divides the delay's own
+  shift out, so the pitch heard follows the `setDopplerEffect()` settings.
+- **Propagation delay no longer makes moving sounds warble.** The delay was
+  ramped with `setTargetAtTime`, whose slope changes within every update, so
+  the pitch wobbled at the update rate (by up to a semitone at 20 m/s). The
+  delay now moves in linear ramps, one per update, each as long as
+  `updateInterval`. The ramps are scheduled 0.1 s ahead and chained end to
+  end, so they never rewrite delay values the audio thread has already used
+  (doing so clicks on every update). Each ramp is timed by when the sound
+  and listener positions were last set rather than by when the update timer
+  fired: positions arrive once per rendered frame and the timer jitters, and
+  timing by the timer made the pitch step by about ±20 cents every update at
+  60 m/s. The Doppler effect now times its velocity estimate the same way.
+
+### Deprecated
+
+- `PropagationDelayConfig.smoothing` is ignored. The linear ramp's length
+  follows `updateInterval`.
+
 ## [0.4.0] - 2026-09-14
 
 ### Added

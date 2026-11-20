@@ -17,6 +17,8 @@ export class ListenerManager {
 
   private autoSync = true;
   private currentPosition: Position;
+  /** performance.now() (ms) when currentPosition was last set. */
+  private positionTime = performance.now();
   private currentOrientation: Orientation = { bearing: 0, pitch: 0, roll: 0 };
 
   constructor(audioEngine: AudioEngine, mapAdapter: MapAdapter, eventEmitter: EventEmitter) {
@@ -37,6 +39,7 @@ export class ListenerManager {
     const pitch = this.mapAdapter.getPitch();
 
     this.currentPosition = center;
+    this.positionTime = performance.now();
     this.currentOrientation = { bearing, pitch, roll: 0 };
 
     this.audioEngine.setListenerPosition(0, 0, 0);
@@ -54,6 +57,7 @@ export class ListenerManager {
   setPosition(position: [number, number, number?]): void {
     this.autoSync = false;
     this.currentPosition = { lng: position[0], lat: position[1], alt: position[2] };
+    this.positionTime = performance.now();
     // Listener stays at origin in audio space; position is tracked for culling
     this.audioEngine.setListenerPosition(0, 0, 0);
     this.eventEmitter.emit('listenerMoved', this.currentPosition);
@@ -78,6 +82,11 @@ export class ListenerManager {
 
   getCurrentPosition(): Position {
     return { ...this.currentPosition };
+  }
+
+  /** performance.now() (ms) when the listener position was last set. */
+  getPositionTime(): number {
+    return this.positionTime;
   }
 
   /**
