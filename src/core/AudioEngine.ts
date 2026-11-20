@@ -73,6 +73,11 @@ export class AudioEngine {
       coneInnerAngle: o.coneInnerAngle ?? 360,
       coneOuterAngle: o.coneOuterAngle ?? 0,
       coneOuterGain: o.coneOuterGain ?? 0,
+      // Direction the sound faces, for the cones above. Same axes as sound
+      // positions (X east, Y up, Z south); defaults are PannerNode's own.
+      orientationX: o.orientationX ?? 1,
+      orientationY: o.orientationY ?? 0,
+      orientationZ: o.orientationZ ?? 0,
     });
   }
 

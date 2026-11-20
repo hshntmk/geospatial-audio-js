@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than the direct sound, so far sounds come out wetter, as in real spaces.
   Without `distanceRolloff` the reverb works as before.
 
+### Fixed
+
+- **`pannerOptions.orientationX/Y/Z` are now applied.** They were accepted
+  by the `SoundPannerOptions` type but never passed to the `PannerNode`, so
+  every sound faced east (the `PannerNode` default) and directional sounds
+  set up with `coneInnerAngle` / `coneOuterAngle` pointed the wrong way.
+  Sounds without cones are unaffected.
+
 ## [0.5.0] - 2026-11-20
 
 ### Fixed

@@ -135,7 +135,17 @@ interface SoundPannerOptions {
   coneInnerAngle?: number;  // directivity: inner cone angle (degrees)
   coneOuterAngle?: number;  // directivity: outer cone angle (degrees)
   coneOuterGain?:  number;  // directivity: gain outside the outer cone
+  orientationX?:   number;  // direction the sound faces (default: 1, 0, 0 = east)
+  orientationY?:   number;
+  orientationZ?:   number;
 }
+```
+
+The orientation only matters when the cones are set: with the default `coneInnerAngle` of 360° the sound is equally loud in every direction. It uses the same axes as sound positions: X = east, Y = up, Z = south (so north is `orientationZ: -1`).
+
+```ts
+// A loudspeaker facing north, loud within ±30° and quiet behind
+pannerOptions: { coneInnerAngle: 60, coneOuterAngle: 180, coneOuterGain: 0.1, orientationX: 0, orientationY: 0, orientationZ: -1 }
 ```
 
 ---

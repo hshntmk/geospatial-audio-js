@@ -99,3 +99,41 @@ describe('AudioEngine reverb wiring', () => {
     expect(sendBus.gain!.value).toBe(0.4);
   });
 });
+
+describe('AudioEngine.createPannerNode', () => {
+  // tests/setup.ts defines PannerNode as writable but not configurable, so
+  // swap it by assignment rather than vi.stubGlobal.
+  const win = window as unknown as { PannerNode: unknown };
+  const original = win.PannerNode;
+  let received: PannerOptions | undefined;
+
+  function setup() {
+    received = undefined;
+    win.PannerNode = class {
+      constructor(_ctx: unknown, options: PannerOptions) { received = options; }
+    };
+    return new AudioEngine();
+  }
+
+  afterEach(() => { win.PannerNode = original; });
+
+  it('passes the sound\'s orientation to the PannerNode', () => {
+    const engine = setup();
+    engine.createPannerNode({ coneInnerAngle: 60, coneOuterAngle: 120, orientationX: 0, orientationY: 0, orientationZ: -1 });
+
+    expect(received).toMatchObject({
+      coneInnerAngle: 60,
+      coneOuterAngle: 120,
+      orientationX: 0,
+      orientationY: 0,
+      orientationZ: -1,
+    });
+  });
+
+  it('keeps PannerNode\'s default orientation (1, 0, 0) when none is given', () => {
+    const engine = setup();
+    engine.createPannerNode();
+
+    expect(received).toMatchObject({ orientationX: 1, orientationY: 0, orientationZ: 0 });
+  });
+});

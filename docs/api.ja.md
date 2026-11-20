@@ -136,7 +136,17 @@ interface SoundPannerOptions {
   coneInnerAngle?: number;  // 指向性: 内側コーン角度(度)
   coneOuterAngle?: number;  // 指向性: 外側コーン角度(度)
   coneOuterGain?:  number;  // 指向性: 外側コーンのゲイン
+  orientationX?:   number;  // 音源の向き（デフォルト: 1, 0, 0 = 東）
+  orientationY?:   number;
+  orientationZ?:   number;
 }
+```
+
+音源の向きは、コーンを設定したときだけ効きます。`coneInnerAngle` がデフォルトの 360° のままなら、どの方向にも同じ大きさで鳴ります。座標の向きは音源の位置と同じで、X が東、Y が上、Z が南です（北向きなら `orientationZ: -1`）。
+
+```ts
+// 北を向いた拡声器。正面 ±30° で大きく、背面では小さい
+pannerOptions: { coneInnerAngle: 60, coneOuterAngle: 180, coneOuterGain: 0.1, orientationX: 0, orientationY: 0, orientationZ: -1 }
 ```
 
 ---
