@@ -36,7 +36,7 @@ class MockPannerNode extends MockAudioNode {
   maxDistance = 10000;
   rolloffFactor = 1;
   coneInnerAngle = 360;
-  coneOuterAngle = 0;
+  coneOuterAngle = 360;
   coneOuterGain = 0;
 }
 

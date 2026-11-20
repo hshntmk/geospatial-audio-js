@@ -130,6 +130,13 @@ describe('AudioEngine.createPannerNode', () => {
     });
   });
 
+  it('uses Web Audio\'s cone defaults when none are given, so a narrowed inner cone fades out towards the back', () => {
+    const engine = setup();
+    engine.createPannerNode({ coneInnerAngle: 60 });
+
+    expect(received).toMatchObject({ coneInnerAngle: 60, coneOuterAngle: 360, coneOuterGain: 0 });
+  });
+
   it('keeps PannerNode\'s default orientation (1, 0, 0) when none is given', () => {
     const engine = setup();
     engine.createPannerNode();

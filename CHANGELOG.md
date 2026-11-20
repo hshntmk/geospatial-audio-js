@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than the direct sound, so far sounds come out wetter, as in real spaces.
   Without `distanceRolloff` the reverb works as before.
 
+### Changed
+
+- **`pannerOptions.coneOuterAngle` now defaults to 360**, Web Audio's own
+  default, instead of 0. With 0, a sound given only `coneInnerAngle` dropped
+  straight to `coneOuterGain` (silent by default) just outside its inner
+  cone; it now fades out towards the back. For example, with
+  `coneInnerAngle: 60`, a listener 90° off the facing direction now hears
+  the sound at about −4.4 dB instead of silence. Only sounds that set
+  `coneInnerAngle` without `coneOuterAngle` are affected; to keep the old
+  hard edge, set `coneOuterAngle` to the same value as `coneInnerAngle`.
+
 ### Fixed
 
 - **`pannerOptions.orientationX/Y/Z` are now applied.** They were accepted

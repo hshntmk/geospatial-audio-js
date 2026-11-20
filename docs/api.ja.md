@@ -133,16 +133,16 @@ interface SoundPannerOptions {
   refDistance?:   number;   // この距離(m)で基準音量(1.0)
   maxDistance?:   number;   // PannerNode の最大距離(m)
   rolloffFactor?: number;   // 距離減衰係数（大きいほど急峻）
-  coneInnerAngle?: number;  // 指向性: 内側コーン角度(度)
-  coneOuterAngle?: number;  // 指向性: 外側コーン角度(度)
-  coneOuterGain?:  number;  // 指向性: 外側コーンのゲイン
+  coneInnerAngle?: number;  // 指向性: 内側コーン角度(度)、デフォルト: 360
+  coneOuterAngle?: number;  // 指向性: 外側コーン角度(度)、デフォルト: 360
+  coneOuterGain?:  number;  // 指向性: 外側コーンのゲイン、デフォルト: 0
   orientationX?:   number;  // 音源の向き（デフォルト: 1, 0, 0 = 東）
   orientationY?:   number;
   orientationZ?:   number;
 }
 ```
 
-音源の向きは、コーンを設定したときだけ効きます。`coneInnerAngle` がデフォルトの 360° のままなら、どの方向にも同じ大きさで鳴ります。座標の向きは音源の位置と同じで、X が東、Y が上、Z が南です（北向きなら `orientationZ: -1`）。
+音源の向きは、コーンを設定したときだけ効きます。`coneInnerAngle` がデフォルトの 360° のままなら、どの方向にも同じ大きさで鳴ります。デフォルト値は Web Audio と同じです。音源の向きから `coneInnerAngle / 2` 以内では元の音量、そこから `coneOuterAngle / 2` までは `coneOuterGain` に向かってなだらかに小さくなり、その外側では `coneOuterGain` のままです。`coneInnerAngle` だけを指定すると、後ろに向かって徐々に小さくなります。座標の向きは音源の位置と同じで、X が東、Y が上、Z が南です（北向きなら `orientationZ: -1`）。
 
 ```ts
 // 北を向いた拡声器。正面 ±30° で大きく、背面では小さい

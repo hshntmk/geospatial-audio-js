@@ -70,8 +70,11 @@ export class AudioEngine {
       refDistance: o.refDistance,
       maxDistance: o.maxDistance,
       rolloffFactor: o.rolloffFactor,
+      // Web Audio's own defaults. coneOuterAngle used to default to 0, which
+      // made a sound given only coneInnerAngle drop straight to coneOuterGain
+      // at the inner cone's edge instead of fading out towards the back.
       coneInnerAngle: o.coneInnerAngle ?? 360,
-      coneOuterAngle: o.coneOuterAngle ?? 0,
+      coneOuterAngle: o.coneOuterAngle ?? 360,
       coneOuterGain: o.coneOuterGain ?? 0,
       // Direction the sound faces, for the cones above. Same axes as sound
       // positions (X east, Y up, Z south); defaults are PannerNode's own.

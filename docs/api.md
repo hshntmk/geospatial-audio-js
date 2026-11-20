@@ -132,16 +132,16 @@ interface SoundPannerOptions {
   refDistance?:   number;   // distance (m) at which volume equals 1.0
   maxDistance?:   number;   // maximum distance (m) for PannerNode
   rolloffFactor?: number;   // distance attenuation factor (higher = steeper drop-off)
-  coneInnerAngle?: number;  // directivity: inner cone angle (degrees)
-  coneOuterAngle?: number;  // directivity: outer cone angle (degrees)
-  coneOuterGain?:  number;  // directivity: gain outside the outer cone
+  coneInnerAngle?: number;  // directivity: inner cone angle (degrees), default: 360
+  coneOuterAngle?: number;  // directivity: outer cone angle (degrees), default: 360
+  coneOuterGain?:  number;  // directivity: gain outside the outer cone, default: 0
   orientationX?:   number;  // direction the sound faces (default: 1, 0, 0 = east)
   orientationY?:   number;
   orientationZ?:   number;
 }
 ```
 
-The orientation only matters when the cones are set: with the default `coneInnerAngle` of 360° the sound is equally loud in every direction. It uses the same axes as sound positions: X = east, Y = up, Z = south (so north is `orientationZ: -1`).
+The orientation only matters when the cones are set: with the default `coneInnerAngle` of 360° the sound is equally loud in every direction. The defaults are Web Audio's own. Within `coneInnerAngle / 2` of the facing direction the sound is at full volume; between that and `coneOuterAngle / 2` it fades towards `coneOuterGain`, and beyond it stays at `coneOuterGain`. So with only `coneInnerAngle` set, the sound fades out towards the back. It uses the same axes as sound positions: X = east, Y = up, Z = south (so north is `orientationZ: -1`).
 
 ```ts
 // A loudspeaker facing north, loud within ±30° and quiet behind
