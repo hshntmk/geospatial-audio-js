@@ -87,7 +87,9 @@ describe('AudioEngine reverb wiring', () => {
     engine.setReverb({ enabled: true, distanceRolloff: 0.3 });
     engine.disableReverb();
 
-    expect(master.connections).toEqual([ctx.destination]);
+    // masterGain → output → destination
+    expect(master.connections).toHaveLength(1);
+    expect((master.connections[0] as Node).connections).toEqual([ctx.destination]);
     expect(sendBus.connections).toHaveLength(0);
     expect(engine.getReverbDistanceRolloff()).toBeNull();
   });
@@ -142,5 +144,57 @@ describe('AudioEngine.createPannerNode', () => {
     engine.createPannerNode();
 
     expect(received).toMatchObject({ orientationX: 1, orientationY: 0, orientationZ: 0 });
+  });
+});
+
+describe('AudioEngine.setLimiter', () => {
+  type Param = { value: number };
+  type Node = { connections: Node[]; gain?: Param; threshold?: Param; knee?: Param; ratio?: Param };
+
+  function setup() {
+    const engine = new AudioEngine();
+    const ctx = engine.getContext() as unknown as { destination: Node };
+    // masterGain feeds the output node, the last stop before the destination.
+    const output = (engine.getMasterGain() as unknown as Node).connections[0];
+    return { engine, ctx, output };
+  }
+
+  it('is off by default: the output goes straight to the destination', () => {
+    const { ctx, output } = setup();
+    expect(output.connections).toEqual([ctx.destination]);
+  });
+
+  it('inserts compressor → trim before the destination when enabled', () => {
+    const { engine, ctx, output } = setup();
+    engine.setLimiter({ enabled: true });
+
+    const [compressor] = output.connections;
+    const [trim] = compressor.connections;
+    expect(output.connections).toHaveLength(1);
+    expect(compressor.threshold!.value).toBe(-3);
+    expect(compressor.knee!.value).toBe(0);
+    expect(compressor.ratio!.value).toBe(20);
+    expect(trim.connections).toEqual([ctx.destination]);
+    // Cancels the compressor's makeup gain: 0.6 × 3 dB × (1 − 1/20) = 1.71 dB
+    expect(trim.gain!.value).toBeCloseTo(Math.pow(10, -1.71 / 20), 6);
+  });
+
+  it('scales the makeup-gain correction with a custom threshold', () => {
+    const { engine, output } = setup();
+    engine.setLimiter({ enabled: true, threshold: -6 });
+
+    const [compressor] = output.connections;
+    expect(compressor.threshold!.value).toBe(-6);
+    expect(compressor.connections[0].gain!.value).toBeCloseTo(Math.pow(10, -3.42 / 20), 6);
+  });
+
+  it('replaces rather than stacks the limiter when enabled twice, and removes it when disabled', () => {
+    const { engine, ctx, output } = setup();
+    engine.setLimiter({ enabled: true });
+    engine.setLimiter({ enabled: true, threshold: -6 });
+    expect(output.connections).toHaveLength(1);
+
+    engine.setLimiter({ enabled: false });
+    expect(output.connections).toEqual([ctx.destination]);
   });
 });

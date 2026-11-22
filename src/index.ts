@@ -24,6 +24,7 @@ export type {
   // Phase 2
   ReverbConfig,
   ReverbPreset,
+  LimiterConfig,
   DopplerConfig,
   PropagationDelayConfig,
   AirAbsorptionConfig,

@@ -7,6 +7,7 @@ import type {
   ScaleConfig,
   LogLevel,
   ReverbConfig,
+  LimiterConfig,
   DopplerConfig,
   PropagationDelayConfig,
   AirAbsorptionConfig,
@@ -258,6 +259,16 @@ export class GeospatialAudio {
 
   setMasterVolume(volume: number): void {
     this.audioEngine.setMasterVolume(volume);
+  }
+
+  /**
+   * Turns the output limiter on or off (off by default). When on, sounds
+   * that add up past full scale are held below `threshold` (default -3 dBFS)
+   * instead of clipping; quieter output is unchanged. Adds about 6 ms of
+   * latency.
+   */
+  setLimiter(config: LimiterConfig): void {
+    this.audioEngine.setLimiter(config);
   }
 
   // ── Doppler ──────────────────────────────────────────────────────────────

@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Set lower than the panner's `rolloffFactor`, the reverb fades more slowly
   than the direct sound, so far sounds come out wetter, as in real spaces.
   Without `distanceRolloff` the reverb works as before.
+- **Output limiter** (`setLimiter()`), off by default. Sounds that add up
+  past full scale are held below `threshold` (default -3 dBFS) instead of
+  clipping. It sits just before the destination, so it also covers the
+  reverb. The compressor's built-in makeup gain is cancelled, so output
+  below the threshold is unchanged; it adds about 6 ms of latency.
 
 ### Changed
 

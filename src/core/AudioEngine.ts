@@ -1,9 +1,15 @@
-import type { GeospatialAudioOptions, SoundPannerOptions, Vector3, ReverbConfig } from '../types/index.js';
+import type { GeospatialAudioOptions, SoundPannerOptions, Vector3, ReverbConfig, LimiterConfig } from '../types/index.js';
 
 /** How fast (s per s) the tracked clock offset may sink, to follow drift between the clocks. */
 const CLOCK_DRIFT = 0.001;
 /** A drop in the clock offset larger than this (s) means the context was suspended: start over. */
 const CLOCK_RESET = 0.05;
+
+// Output limiter settings (see setLimiter).
+const LIMITER_THRESHOLD = -3; // dBFS
+const LIMITER_RATIO = 20;
+const LIMITER_ATTACK = 0.003; // s
+const LIMITER_RELEASE = 0.25; // s
 
 const DEFAULTS: Required<GeospatialAudioOptions> = {
   distanceModel: 'inverse',
@@ -26,6 +32,14 @@ export class AudioEngine {
    * volume, since the sends bypass masterGain.
    */
   private reverbSendBus: GainNode;
+  /**
+   * The last node before the destination; everything audible goes through
+   * it, so the limiter (see setLimiter) can be inserted in one place.
+   */
+  private output: GainNode;
+  // Limiter nodes, present only while the limiter is on.
+  private limiter: DynamicsCompressorNode | null = null;
+  private limiterTrim: GainNode | null = null;
   private options: Required<GeospatialAudioOptions>;
   /** Peak of currentTime − performance.now() (s) and when it was updated (ms); see contextTimeAt. */
   private clockOffset = -Infinity;
@@ -48,7 +62,9 @@ export class AudioEngine {
     this.audioContext = new Ctx();
 
     this.masterGain = this.audioContext.createGain();
-    this.masterGain.connect(this.audioContext.destination);
+    this.output = this.audioContext.createGain();
+    this.output.connect(this.audioContext.destination);
+    this.masterGain.connect(this.output);
     this.reverbSendBus = this.audioContext.createGain();
   }
 
@@ -149,13 +165,13 @@ export class AudioEngine {
    * Enables or updates the reverb effect.
    *
    * Audio graph with reverb (the mix of all sounds feeds the reverb):
-   *   masterGain ─┬─ dryGain ──────────────────── destination
-   *               └─ reverbGain ── convolver ───── destination
+   *   masterGain ─┬─ dryGain ──────────────────── output
+   *               └─ reverbGain ── convolver ───── output
    *
    * With `distanceRolloff` set, each sound feeds the reverb through its own
    * send instead, before its PannerNode (see SoundSource.setPosition):
-   *   masterGain ── dryGain ───────────────────────────── destination
-   *   reverbSendBus ── reverbGain ── convolver ─────────── destination
+   *   masterGain ── dryGain ───────────────────────────── output
+   *   reverbSendBus ── reverbGain ── convolver ─────────── output
    */
   setReverb(config: ReverbConfig): void {
     if (!config.enabled) {
@@ -169,9 +185,9 @@ export class AudioEngine {
       this.reverbGain = this.audioContext.createGain();
       this.dryGain    = this.audioContext.createGain();
 
-      this.dryGain.connect(this.audioContext.destination);
+      this.dryGain.connect(this.output);
       this.reverbGain.connect(this.convolver);
-      this.convolver.connect(this.audioContext.destination);
+      this.convolver.connect(this.output);
     }
 
     // (Re)wire the reverb's input for the chosen mode.
@@ -199,12 +215,59 @@ export class AudioEngine {
     this.reverbGain!.disconnect();
     this.dryGain!.disconnect();
 
-    this.masterGain.connect(this.audioContext.destination);
+    this.masterGain.connect(this.output);
 
     this.convolver  = null;
     this.reverbGain = null;
     this.dryGain    = null;
     this.reverbDistanceRolloff = null;
+  }
+
+  /**
+   * Turns the output limiter on or off. When on, everything audible passes
+   * through a DynamicsCompressorNode set as a limiter (ratio 20, hard knee)
+   * before the destination, so sounds that add up past full scale are held
+   * below it instead of clipping.
+   *
+   *   output ── compressor ── trim ── destination
+   *
+   * The compressor applies its own makeup gain, which would raise everything
+   * below the threshold too; the trim GainNode takes it back out, so signals
+   * below the threshold come out unchanged. The compressor's lookahead
+   * delays the output by about 6 ms.
+   */
+  setLimiter(config: LimiterConfig): void {
+    if (this.limiter) {
+      this.output.disconnect();
+      this.limiter.disconnect();
+      this.limiterTrim!.disconnect();
+      this.limiter = null;
+      this.limiterTrim = null;
+    }
+    if (!config.enabled) {
+      this.output.connect(this.audioContext.destination);
+      return;
+    }
+
+    const threshold = config.threshold ?? LIMITER_THRESHOLD;
+    const limiter = this.audioContext.createDynamicsCompressor();
+    limiter.threshold.value = threshold;
+    limiter.knee.value = 0;
+    limiter.ratio.value = LIMITER_RATIO;
+    limiter.attack.value = LIMITER_ATTACK;
+    limiter.release.value = LIMITER_RELEASE;
+    // Web Audio's compressor boosts by 0.6 × the gain reduction it would
+    // apply to a full-scale signal; undo exactly that.
+    const makeupDb = 0.6 * -threshold * (1 - 1 / LIMITER_RATIO);
+    const trim = this.audioContext.createGain();
+    trim.gain.value = Math.pow(10, -makeupDb / 20);
+
+    this.output.disconnect();
+    this.output.connect(limiter);
+    limiter.connect(trim);
+    trim.connect(this.audioContext.destination);
+    this.limiter = limiter;
+    this.limiterTrim = trim;
   }
 
   /** ReverbConfig.distanceRolloff while distance-based reverb is on, else null. */

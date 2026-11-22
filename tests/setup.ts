@@ -22,6 +22,14 @@ class MockConvolverNode extends MockAudioNode {
   buffer: unknown = null;
 }
 
+class MockDynamicsCompressorNode extends MockAudioNode {
+  threshold = new MockAudioParam();
+  knee = new MockAudioParam();
+  ratio = new MockAudioParam();
+  attack = new MockAudioParam();
+  release = new MockAudioParam();
+}
+
 class MockGainNode extends MockAudioNode {
   gain = new MockAudioParam();
 }
@@ -75,6 +83,8 @@ class MockAudioContext {
   createBufferSource() { return new MockAudioBufferSourceNode(); }
 
   createConvolver() { return new MockConvolverNode(); }
+
+  createDynamicsCompressor() { return new MockDynamicsCompressorNode(); }
 
   createBuffer(channels: number, length: number) {
     const data = Array.from({ length: channels }, () => new Float32Array(length));

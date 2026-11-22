@@ -123,6 +123,17 @@ export interface ReverbConfig {
   distanceRolloff?: number;
 }
 
+// ---- Limiter ----
+
+export interface LimiterConfig {
+  enabled: boolean;
+  /**
+   * Level (dBFS) above which the output is held down. Signals below it pass
+   * unchanged. Default: -3
+   */
+  threshold?: number;
+}
+
 // ---- Doppler ----
 
 export interface DopplerConfig {

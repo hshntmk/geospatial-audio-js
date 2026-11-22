@@ -470,6 +470,25 @@ Sets the master volume applied to all sound sources (`0.0`–`1.0`, clamped if o
 audio.setMasterVolume(0.8);
 ```
 
+### `setLimiter(config: LimiterConfig): void`
+
+Turns the output limiter on or off. It is off by default. When on, sounds that add up past full scale are held below `threshold` instead of clipping. With ten overlapping sounds that peaked at 2.1 (clipping on about 30,000 samples in 1.3 s), the peak stayed at 0.82 with the limiter on.
+
+```ts
+audio.setLimiter({ enabled: true });                 // threshold -3 dBFS
+audio.setLimiter({ enabled: true, threshold: -6 });  // hold the output lower
+audio.setLimiter({ enabled: false });
+```
+
+```ts
+interface LimiterConfig {
+  enabled:    boolean;
+  threshold?: number;  // dBFS, default: -3
+}
+```
+
+> **How it works:** a `DynamicsCompressorNode` (ratio 20, hard knee, attack 3 ms, release 250 ms) is inserted just before the destination, so it also covers the reverb. Web Audio's compressor raises everything by its own makeup gain (1.71 dB at the default threshold); a `GainNode` after it takes that back out, so output below the threshold is unchanged. The compressor's lookahead delays the output by about 6 ms.
+
 ---
 
 ## Performance Optimization

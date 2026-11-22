@@ -471,6 +471,25 @@ cutoff = minCutoffFrequency + (maxCutoffFrequency − minCutoffFrequency) × e^(
 audio.setMasterVolume(0.8);
 ```
 
+### `setLimiter(config: LimiterConfig): void`
+
+出力のリミッターを有効・無効にします。デフォルトは無効です。有効にすると、複数の音が重なって最大値を超えそうなとき、音割れさせずに `threshold` 以下に抑えます。10 個の音を重ねて最大値が 2.1 になり、1.3 秒間で約 3 万サンプルが音割れした条件で、リミッターを有効にすると最大値は 0.82 に収まりました。
+
+```ts
+audio.setLimiter({ enabled: true });                 // しきい値 -3 dBFS
+audio.setLimiter({ enabled: true, threshold: -6 });  // より低く抑える
+audio.setLimiter({ enabled: false });
+```
+
+```ts
+interface LimiterConfig {
+  enabled:    boolean;
+  threshold?: number;  // dBFS、デフォルト: -3
+}
+```
+
+> **仕組み:** 出力の直前に `DynamicsCompressorNode`（比率 20、ハードニー、アタック 3 ms、リリース 250 ms）を入れるので、リバーブの音にも効きます。Web Audio のコンプレッサーは自動のメイクアップゲインで全体を持ち上げます（デフォルトのしきい値では 1.71 dB）。その後ろの `GainNode` で同じ量だけ下げるので、しきい値より小さい音は変わりません。コンプレッサーの先読みのため、出力が約 6 ms 遅れます。
+
 ---
 
 ## パフォーマンス最適化
